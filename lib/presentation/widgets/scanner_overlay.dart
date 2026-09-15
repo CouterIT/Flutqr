@@ -77,10 +77,11 @@ class _ScannerOverlayState extends State<ScannerOverlay>
                       color: widget.scanLineColor,
                       boxShadow: [
                         BoxShadow(
-                          color: widget.scanLineColor.withOpacity(0.8),
+                          color: widget.scanLineColor.withValues(alpha: 0.8),
                           blurRadius: 8,
                           spreadRadius: 2,
                         ),
+
                       ],
                     ),
                   ),

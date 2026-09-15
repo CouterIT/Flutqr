@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -27,8 +28,15 @@ class QRService {
     final clean = rawValue.trim();
     final lower = clean.toLowerCase();
 
-    // Ảnh: bắt đầu bằng "IMG:" hoặc "file://" hoặc kết thúc bằng đuôi ảnh
-    if (clean.startsWith('IMG:') || clean.startsWith('file://') || lower.endsWith('.jpg') || lower.endsWith('.png') || lower.endsWith('.jpeg')) {
+    // Ảnh: bắt đầu bằng "IMG:", "file://", chứa "ibb.co" hoặc kết thúc bằng đuôi file ảnh
+    if (clean.startsWith('IMG:') ||
+        clean.startsWith('file://') ||
+        lower.contains('ibb.co') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.webp')) {
       return QRType.image;
     } else if (clean.startsWith('WIFI:') || clean.startsWith('wifi:')) {
       return QRType.wifi;
@@ -157,28 +165,45 @@ class QRService {
 
   /// Mở URL trong trình duyệt bên ngoài (browser app của thiết bị).
   ///
-  /// Đảm bảo URL luôn có prefix "http://" hoặc "https://"
-  /// vì `canLaunchUrl` sẽ trả false nếu URL thiếu scheme.
+  /// Đảm bảo URL luôn có prefix "http://" hoặc "https://".
+  /// Tự động fallback mở trực tiếp bằng externalApplication hoặc platformDefault.
   static Future<bool> launchURL(String rawUrl) async {
+    final String cleanUrl = rawUrl.trim();
+    if (cleanUrl.isEmpty) return false;
+
     final String formattedUrl =
-        rawUrl.startsWith('http') ? rawUrl : 'https://$rawUrl';
-    final Uri uri = Uri.parse(formattedUrl);
-    if (await canLaunchUrl(uri)) {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+        (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://'))
+            ? cleanUrl
+            : 'https://$cleanUrl';
+
+    try {
+      final Uri uri = Uri.parse(formattedUrl);
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      // Fallback: Thử mở trực tiếp nếu canLaunchUrl bị hạn chế bởi hệ điều hành
+      return await launchUrl(uri, mode: LaunchMode.platformDefault);
+    } catch (e) {
+      debugPrint('Lỗi mở URL ($formattedUrl): $e');
+      return false;
     }
-    return false;
   }
 
   /// Mở ứng dụng điện thoại với số điện thoại đã điền sẵn.
-  ///
-  /// Xóa prefix "tel:" nếu có vì `Uri.parse('tel:...')` cần số thuần.
   static Future<bool> launchPhoneDialer(String rawNumber) async {
     final String cleanNumber = rawNumber.replaceFirst('tel:', '').trim();
-    final Uri uri = Uri.parse('tel:$cleanNumber');
-    if (await canLaunchUrl(uri)) {
+    if (cleanNumber.isEmpty) return false;
+
+    try {
+      final Uri uri = Uri.parse('tel:$cleanNumber');
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri);
+      }
       return await launchUrl(uri);
+    } catch (e) {
+      debugPrint('Lỗi mở cuộc gọi ($cleanNumber): $e');
+      return false;
     }
-    return false;
   }
 
   /// Sao chép text vào clipboard hệ thống.

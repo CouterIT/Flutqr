@@ -1,67 +1,52 @@
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_colors.dart';
-import '../core/constants/app_strings.dart';
 
-/// Enum classifying the payload of a QR code
+/// Enum restricting QR creation to 4 primary types: text, number, website, location
 enum QRType {
-  url,
   text,
-  wifi,
-  email,
-  phone,
-  contact,
+  number,
+  website,
+  location,
 }
 
 extension QRTypeExtension on QRType {
   String get displayName {
     switch (this) {
-      case QRType.url:
-        return AppStrings.typeUrl;
       case QRType.text:
-        return AppStrings.typeText;
-      case QRType.wifi:
-        return AppStrings.typeWifi;
-      case QRType.email:
-        return AppStrings.typeEmail;
-      case QRType.phone:
-        return AppStrings.typePhone;
-      case QRType.contact:
-        return 'Danh bạ';
+        return 'Text';
+      case QRType.number:
+        return 'Number';
+      case QRType.website:
+        return 'Website';
+      case QRType.location:
+        return 'Location';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case QRType.url:
-        return Icons.link_rounded;
       case QRType.text:
-        return Icons.text_snippet_rounded;
-      case QRType.wifi:
-        return Icons.wifi_rounded;
-      case QRType.email:
-        return Icons.email_rounded;
-      case QRType.phone:
+        return Icons.notes_rounded;
+      case QRType.number:
         return Icons.phone_rounded;
-      case QRType.contact:
-        return Icons.person_rounded;
+      case QRType.website:
+        return Icons.web_rounded;
+      case QRType.location:
+        return Icons.location_on_rounded;
     }
   }
 
   Color get color {
     switch (this) {
-      case QRType.url:
-        return AppColors.typeUrl;
       case QRType.text:
-        return AppColors.typeText;
-      case QRType.wifi:
-        return AppColors.typeWifi;
-      case QRType.email:
-        return AppColors.typeEmail;
-      case QRType.phone:
-        return AppColors.typePhone;
-      case QRType.contact:
-        return AppColors.typeContact;
+        return AppColors.primary;
+      case QRType.number:
+        return const Color(0xFF10B981);
+      case QRType.website:
+        return const Color(0xFF3B82F6);
+      case QRType.location:
+        return const Color(0xFFEF4444);
     }
   }
 }

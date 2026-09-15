@@ -47,9 +47,10 @@ class _ScanScreenState extends State<ScanScreen> {
 
     _controller.stop();
 
-    // Parse data & save to history
+    // Parse data & save to scanned history
     final QRDataModel model = QRService.parseRawData(rawValue, isGenerated: false);
-    await StorageService.saveItem(model);
+    await StorageService.saveScannedItem(model);
+
 
     if (mounted) {
       await Navigator.of(context).push(

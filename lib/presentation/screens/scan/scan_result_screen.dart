@@ -24,57 +24,46 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
 
   String get _typeTitle {
     switch (widget.qrData.type) {
-      case QRType.url:
+      case QRType.website:
         return 'Website';
       case QRType.text:
         return 'Văn bản';
-      case QRType.wifi:
-        return 'Wi-Fi';
-      case QRType.email:
-        return 'Email';
-      case QRType.phone:
-        return 'Số điện thoại';
-      case QRType.contact:
-        return 'Danh bạ';
+      case QRType.number:
+        return 'Number';
+      case QRType.location:
+        return 'Location';
     }
   }
 
   IconData get _typeIcon {
     switch (widget.qrData.type) {
-      case QRType.url:
+      case QRType.website:
         return Icons.web_rounded;
       case QRType.text:
-        return Icons.text_snippet_rounded;
-      case QRType.wifi:
-        return Icons.wifi_rounded;
-      case QRType.email:
-        return Icons.email_rounded;
-      case QRType.phone:
+        return Icons.notes_rounded;
+      case QRType.number:
         return Icons.phone_rounded;
-      case QRType.contact:
-        return Icons.person_rounded;
+      case QRType.location:
+        return Icons.location_on_rounded;
     }
   }
 
   String get _actionLabelText {
     switch (widget.qrData.type) {
-      case QRType.url:
+      case QRType.website:
         return 'Open URL\nin google';
       case QRType.text:
         return 'Sao chép văn bản';
-      case QRType.wifi:
-        return 'Kết nối Wi-Fi';
-      case QRType.email:
-        return 'Gửi Email';
-      case QRType.phone:
-        return 'Gọi điện thoại';
-      case QRType.contact:
-        return 'Thêm danh bạ';
+      case QRType.number:
+        return 'Gọi số điện thoại';
+      case QRType.location:
+        return 'Mở vị trí\ntrên Google Maps';
     }
   }
 
   void _performMainAction() {
-    if (widget.qrData.type == QRType.url) {
+    if (widget.qrData.type == QRType.website ||
+        widget.qrData.type == QRType.location) {
       QRService.launchURL(widget.qrData.rawValue);
     } else {
       QRService.copyToClipboard(widget.qrData.rawValue);
@@ -250,7 +239,8 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                         text: TextSpan(
                           children: [
                             TextSpan(
-                              text: widget.qrData.type == QRType.url
+                              text: widget.qrData.type == QRType.website ||
+                                      widget.qrData.type == QRType.location
                                   ? 'URL : '
                                   : 'Nội dung : ',
                               style: const TextStyle(

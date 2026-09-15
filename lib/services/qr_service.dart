@@ -14,48 +14,43 @@ class QRService {
     final clean = rawValue.trim();
     final lower = clean.toLowerCase();
 
-    if (clean.startsWith('WIFI:') || clean.startsWith('wifi:')) {
-      return QRType.wifi;
-    } else if (clean.startsWith('BEGIN:VCARD')) {
-      return QRType.contact;
+    if (lower.contains('maps.google.com') || lower.contains('goo.gl/maps')) {
+      return QRType.location;
     } else if (lower.startsWith('http://') ||
         lower.startsWith('https://') ||
         lower.startsWith('www.')) {
-      return QRType.url;
-    } else if (lower.startsWith('mailto:') ||
-        RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(clean)) {
-      return QRType.email;
+      return QRType.website;
     } else if (lower.startsWith('tel:') ||
         RegExp(r'^\+?[0-9]{8,15}$').hasMatch(clean)) {
-      return QRType.phone;
+      return QRType.number;
     }
 
     return QRType.text;
+  }
+
+  /// Helper to build Google Maps location search URL
+  static String buildGoogleMapsUrl(String input) {
+    final clean = input.trim();
+    if (clean.isEmpty) return '';
+    final encoded = Uri.encodeComponent(clean);
+    return 'https://www.google.com/maps/search/?api=1&query=$encoded';
   }
 
   /// Parse raw QR value into QRDataModel entity
   static QRDataModel parseRawData(String rawValue, {bool isGenerated = false}) {
     final type = detectType(rawValue);
     final String id = DateTime.now().millisecondsSinceEpoch.toString();
-    Map<String, String>? metadata;
     String title = rawValue;
 
     switch (type) {
-      case QRType.wifi:
-        metadata = parseWifiString(rawValue);
-        title = 'Wi-Fi: ${metadata['ssid'] ?? 'Không tên'}';
-        break;
-      case QRType.url:
+      case QRType.website:
         title = rawValue.startsWith('http') ? rawValue : 'https://$rawValue';
         break;
-      case QRType.email:
-        title = rawValue.replaceFirst('mailto:', '');
-        break;
-      case QRType.phone:
+      case QRType.number:
         title = rawValue.replaceFirst('tel:', '');
         break;
-      case QRType.contact:
-        title = 'Danh bạ VCard';
+      case QRType.location:
+        title = 'Vị trí Google Maps';
         break;
       case QRType.text:
         title = rawValue.length > 30 ? '${rawValue.substring(0, 30)}...' : rawValue;
@@ -69,23 +64,7 @@ class QRService {
       title: title,
       timestamp: DateTime.now(),
       isGenerated: isGenerated,
-      metadata: metadata,
     );
-  }
-
-  /// Parse Wi-Fi format: WIFI:S:MySSID;P:MyPassword;T:WPA;;
-  static Map<String, String> parseWifiString(String raw) {
-    final Map<String, String> result = {};
-    try {
-      final ssidMatch = RegExp(r'S:(.*?);').firstMatch(raw);
-      final passMatch = RegExp(r'P:(.*?);').firstMatch(raw);
-      final typeMatch = RegExp(r'T:(.*?);').firstMatch(raw);
-
-      if (ssidMatch != null) result['ssid'] = ssidMatch.group(1) ?? '';
-      if (passMatch != null) result['password'] = passMatch.group(1) ?? '';
-      if (typeMatch != null) result['authType'] = typeMatch.group(1) ?? 'WPA';
-    } catch (_) {}
-    return result;
   }
 
   /// Open URL in external browser

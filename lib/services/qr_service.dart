@@ -130,6 +130,16 @@ class QRService {
     return false;
   }
 
+  /// Launch native Phone Dialer app with number pre-filled
+  static Future<bool> launchPhoneDialer(String rawNumber) async {
+    final String cleanNumber = rawNumber.replaceFirst('tel:', '').trim();
+    final Uri uri = Uri.parse('tel:$cleanNumber');
+    if (await canLaunchUrl(uri)) {
+      return await launchUrl(uri);
+    }
+    return false;
+  }
+
   /// Copy text content to system Clipboard
   static Future<void> copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));

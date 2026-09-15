@@ -6,8 +6,8 @@ import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 
-/// Scan Result Screen supporting all 7 QR payload types
-class ScanResultScreen extends StatefulWidget {
+/// Scan Result Screen matching Screenshot 2 design without color palette row
+class ScanResultScreen extends StatelessWidget {
   final QRDataModel qrData;
 
   const ScanResultScreen({
@@ -15,15 +15,8 @@ class ScanResultScreen extends StatefulWidget {
     required this.qrData,
   });
 
-  @override
-  State<ScanResultScreen> createState() => _ScanResultScreenState();
-}
-
-class _ScanResultScreenState extends State<ScanResultScreen> {
-  int _selectedTemplateIndex = 0;
-
   String get _typeTitle {
-    switch (widget.qrData.type) {
+    switch (qrData.type) {
       case QRType.website:
         return 'Website';
       case QRType.text:
@@ -42,7 +35,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   }
 
   IconData get _typeIcon {
-    switch (widget.qrData.type) {
+    switch (qrData.type) {
       case QRType.website:
         return Icons.web_rounded;
       case QRType.text:
@@ -61,15 +54,15 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   }
 
   String get _actionLabelText {
-    switch (widget.qrData.type) {
+    switch (qrData.type) {
       case QRType.website:
         return 'Open URL\nin google';
-      case QRType.text:
-        return 'Sao chép văn bản';
       case QRType.number:
-        return 'Gọi số điện thoại';
+        return 'Gọi số điện thoại\n(Phone Dialer)';
       case QRType.location:
         return 'Mở vị trí\ntrên Google Maps';
+      case QRType.text:
+        return 'Sao chép văn bản';
       case QRType.wifi:
         return 'Sao chép thông tin Wi-Fi';
       case QRType.vcard:
@@ -79,12 +72,13 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     }
   }
 
-  void _performMainAction() {
-    if (widget.qrData.type == QRType.website ||
-        widget.qrData.type == QRType.location) {
-      QRService.launchURL(widget.qrData.rawValue);
+  void _performMainAction(BuildContext context) {
+    if (qrData.type == QRType.website || qrData.type == QRType.location) {
+      QRService.launchURL(qrData.rawValue);
+    } else if (qrData.type == QRType.number) {
+      QRService.launchPhoneDialer(qrData.rawValue);
     } else {
-      QRService.copyToClipboard(widget.qrData.rawValue);
+      QRService.copyToClipboard(qrData.rawValue);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đã sao chép nội dung!'),
@@ -119,7 +113,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
           IconButton(
             icon: const Icon(Icons.share_rounded, color: Colors.white),
             onPressed: () {
-              QRService.shareContent(widget.qrData.rawValue);
+              QRService.shareContent(qrData.rawValue);
             },
           ),
         ],
@@ -161,6 +155,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 36),
 
@@ -173,9 +168,9 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: QrImageView(
-                          data: widget.qrData.rawValue,
+                          data: qrData.rawValue,
                           version: QrVersions.auto,
-                          size: 210,
+                          size: 220,
                           eyeStyle: const QrEyeStyle(
                             eyeShape: QrEyeShape.square,
                             color: Colors.black,
@@ -190,153 +185,68 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
 
                     const SizedBox(height: 36),
 
-                    // Main Action Text
-                    InkWell(
-                      onTap: _performMainAction,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        child: Text(
-                          _actionLabelText,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
-                            height: 1.25,
+                    // Main Action Text (e.g. "Open URL in google")
+                    Center(
+                      child: InkWell(
+                        onTap: () => _performMainAction(context),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: Text(
+                            _actionLabelText,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                              height: 1.25,
+                            ),
                           ),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 48),
 
-                    // Customization Palette Presets Row
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildTemplateIcon(
-                            index: 0,
-                            child: const Icon(
-                              Icons.photo_library_outlined,
-                              size: 24,
-                              color: AppColors.textPrimary,
+                    // URL / Payload details display at bottom with aligned layout
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          qrData.type == QRType.website ||
+                                  qrData.type == QRType.location
+                              ? 'URL :'
+                              : 'Nội dung :',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: () => _performMainAction(context),
+                          child: Text(
+                            qrData.rawValue,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w400,
+                              color: Color(0xFF4285F4), // Blue link color
+                              decoration: TextDecoration.underline,
+                              height: 1.35,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          _buildTemplateIcon(
-                            index: 1,
-                            child: const Icon(
-                              Icons.block_rounded,
-                              size: 24,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          _buildColorPresetThumbnail(index: 2, color: Colors.lightBlue),
-                          const SizedBox(width: 10),
-                          _buildColorPresetThumbnail(index: 3, color: Colors.cyan),
-                          const SizedBox(width: 10),
-                          _buildColorPresetThumbnail(index: 4, color: Colors.brown),
-                          const SizedBox(width: 10),
-                          _buildColorPresetThumbnail(index: 5, color: Colors.indigo),
-                          const SizedBox(width: 10),
-                          _buildColorPresetThumbnail(index: 6, color: Colors.teal),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 32),
-
-                    // Details display at bottom
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: widget.qrData.type == QRType.website ||
-                                      widget.qrData.type == QRType.location
-                                  ? 'URL : '
-                                  : 'Nội dung : ',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
-                            WidgetSpan(
-                              child: GestureDetector(
-                                onTap: _performMainAction,
-                                child: Text(
-                                  widget.qrData.rawValue,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w400,
-                                    color: Color(0xFF4285F4),
-                                    decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
                   ],
                 ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTemplateIcon({required int index, required Widget child}) {
-    final bool isSelected = _selectedTemplateIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTemplateIndex = index),
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : const Color(0xFFE0E0E0),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Center(child: child),
-      ),
-    );
-  }
-
-  Widget _buildColorPresetThumbnail({required int index, required Color color}) {
-    final bool isSelected = _selectedTemplateIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedTemplateIndex = index),
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : const Color(0xFFE0E0E0),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Center(
-          child: Icon(
-            Icons.qr_code_2_rounded,
-            size: 24,
-            color: color,
-          ),
         ),
       ),
     );

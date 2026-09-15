@@ -202,17 +202,17 @@ class _GenerateScreenState extends State<GenerateScreen> {
         QRService.parseRawData(_qrPayload, isGenerated: true);
     await StorageService.saveCreatedItem(model);
 
+    _cancelCreationFlow();
+    _loadCreatedCodes();
+
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã tạo và lưu mã QR thành công!'),
-          duration: Duration(seconds: 2),
+      // Direct navigation to ScanResultScreen upon creation
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ScanResultScreen(qrData: model),
         ),
       );
     }
-
-    _cancelCreationFlow();
-    _loadCreatedCodes();
   }
 
   Future<void> _deleteCreatedItem(String id) async {
@@ -476,7 +476,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
 
           // Action Buttons
           CustomButton(
-            text: 'Lưu & Tạo mã QR',
+            text: 'Tạo mã QR',
             icon: Icons.check_circle_outline_rounded,
             color: _selectedType!.color,
             onPressed: _qrPayload.isNotEmpty ? _saveAndFinishCreation : null,

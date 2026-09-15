@@ -14,7 +14,13 @@ class QRService {
     final clean = rawValue.trim();
     final lower = clean.toLowerCase();
 
-    if (lower.contains('maps.google.com') || lower.contains('goo.gl/maps')) {
+    if (clean.startsWith('WIFI:') || clean.startsWith('wifi:')) {
+      return QRType.wifi;
+    } else if (clean.startsWith('BEGIN:VCARD')) {
+      return QRType.vcard;
+    } else if (clean.startsWith('BEGIN:VEVENT')) {
+      return QRType.event;
+    } else if (lower.contains('maps.google.com') || lower.contains('goo.gl/maps')) {
       return QRType.location;
     } else if (lower.startsWith('http://') ||
         lower.startsWith('https://') ||
@@ -36,6 +42,43 @@ class QRService {
     return 'https://www.google.com/maps/search/?api=1&query=$encoded';
   }
 
+  /// Helper to build vCard 3.0 string
+  static String buildVCardString({
+    required String name,
+    required String phone,
+    required String email,
+    required String company,
+    required String address,
+  }) {
+    final buffer = StringBuffer();
+    buffer.writeln('BEGIN:VCARD');
+    buffer.writeln('VERSION:3.0');
+    if (name.isNotEmpty) buffer.writeln('FN:$name');
+    if (phone.isNotEmpty) buffer.writeln('TEL:$phone');
+    if (email.isNotEmpty) buffer.writeln('EMAIL:$email');
+    if (company.isNotEmpty) buffer.writeln('ORG:$company');
+    if (address.isNotEmpty) buffer.writeln('ADR:;;$address;;;;');
+    buffer.write('END:VCARD');
+    return buffer.toString();
+  }
+
+  /// Helper to build iCalendar VEVENT string for Invitations / Events
+  static String buildEventString({
+    required String title,
+    required String location,
+    required String dateTime,
+    required String description,
+  }) {
+    final buffer = StringBuffer();
+    buffer.writeln('BEGIN:VEVENT');
+    if (title.isNotEmpty) buffer.writeln('SUMMARY:$title');
+    if (location.isNotEmpty) buffer.writeln('LOCATION:$location');
+    if (dateTime.isNotEmpty) buffer.writeln('DTSTART:$dateTime');
+    if (description.isNotEmpty) buffer.writeln('DESCRIPTION:$description');
+    buffer.write('END:VEVENT');
+    return buffer.toString();
+  }
+
   /// Parse raw QR value into QRDataModel entity
   static QRDataModel parseRawData(String rawValue, {bool isGenerated = false}) {
     final type = detectType(rawValue);
@@ -51,6 +94,15 @@ class QRService {
         break;
       case QRType.location:
         title = 'Vị trí Google Maps';
+        break;
+      case QRType.wifi:
+        title = 'Mạng Wi-Fi';
+        break;
+      case QRType.vcard:
+        title = 'Danh bạ vCard';
+        break;
+      case QRType.event:
+        title = 'Thiệp mời / Sự kiện';
         break;
       case QRType.text:
         title = rawValue.length > 30 ? '${rawValue.substring(0, 30)}...' : rawValue;

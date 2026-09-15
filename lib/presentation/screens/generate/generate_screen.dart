@@ -10,7 +10,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/qr_view_box.dart';
 import '../scan/scan_result_screen.dart';
 
-/// Created Codes Screen (Matching Screenshot 1 & 2 flow)
+/// Created Codes Screen with 7 Creation Categories
 class GenerateScreen extends StatefulWidget {
   const GenerateScreen({super.key});
 
@@ -26,10 +26,28 @@ class _GenerateScreenState extends State<GenerateScreen> {
   bool _isCreating = false;
   QRType? _selectedType;
 
+  // Input Controllers
   final TextEditingController _textController = TextEditingController();
   final TextEditingController _numberController = TextEditingController();
   final TextEditingController _websiteController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
+
+  // Wi-Fi Controllers
+  final TextEditingController _wifiSsidController = TextEditingController();
+  final TextEditingController _wifiPassController = TextEditingController();
+
+  // vCard Controllers
+  final TextEditingController _vcardNameController = TextEditingController();
+  final TextEditingController _vcardPhoneController = TextEditingController();
+  final TextEditingController _vcardEmailController = TextEditingController();
+  final TextEditingController _vcardCompanyController = TextEditingController();
+  final TextEditingController _vcardAddressController = TextEditingController();
+
+  // Event / Invitation Controllers
+  final TextEditingController _eventTitleController = TextEditingController();
+  final TextEditingController _eventLocationController = TextEditingController();
+  final TextEditingController _eventDateTimeController = TextEditingController();
+  final TextEditingController _eventNoteController = TextEditingController();
 
   String _qrPayload = '';
 
@@ -42,6 +60,20 @@ class _GenerateScreenState extends State<GenerateScreen> {
     _numberController.addListener(_updatePayload);
     _websiteController.addListener(_updatePayload);
     _locationController.addListener(_updatePayload);
+
+    _wifiSsidController.addListener(_updatePayload);
+    _wifiPassController.addListener(_updatePayload);
+
+    _vcardNameController.addListener(_updatePayload);
+    _vcardPhoneController.addListener(_updatePayload);
+    _vcardEmailController.addListener(_updatePayload);
+    _vcardCompanyController.addListener(_updatePayload);
+    _vcardAddressController.addListener(_updatePayload);
+
+    _eventTitleController.addListener(_updatePayload);
+    _eventLocationController.addListener(_updatePayload);
+    _eventDateTimeController.addListener(_updatePayload);
+    _eventNoteController.addListener(_updatePayload);
   }
 
   Future<void> _loadCreatedCodes() async {
@@ -80,6 +112,42 @@ class _GenerateScreenState extends State<GenerateScreen> {
           final loc = _locationController.text.trim();
           _qrPayload = loc.isNotEmpty ? QRService.buildGoogleMapsUrl(loc) : '';
           break;
+        case QRType.wifi:
+          final ssid = _wifiSsidController.text.trim();
+          final pass = _wifiPassController.text.trim();
+          if (ssid.isNotEmpty) {
+            _qrPayload = 'WIFI:S:$ssid;P:$pass;T:WPA;;';
+          } else {
+            _qrPayload = '';
+          }
+          break;
+        case QRType.vcard:
+          final name = _vcardNameController.text.trim();
+          if (name.isNotEmpty || _vcardPhoneController.text.isNotEmpty) {
+            _qrPayload = QRService.buildVCardString(
+              name: name,
+              phone: _vcardPhoneController.text.trim(),
+              email: _vcardEmailController.text.trim(),
+              company: _vcardCompanyController.text.trim(),
+              address: _vcardAddressController.text.trim(),
+            );
+          } else {
+            _qrPayload = '';
+          }
+          break;
+        case QRType.event:
+          final title = _eventTitleController.text.trim();
+          if (title.isNotEmpty) {
+            _qrPayload = QRService.buildEventString(
+              title: title,
+              location: _eventLocationController.text.trim(),
+              dateTime: _eventDateTimeController.text.trim(),
+              description: _eventNoteController.text.trim(),
+            );
+          } else {
+            _qrPayload = '';
+          }
+          break;
       }
     });
   }
@@ -89,10 +157,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
       _isCreating = true;
       _selectedType = null;
       _qrPayload = '';
-      _textController.clear();
-      _numberController.clear();
-      _websiteController.clear();
-      _locationController.clear();
+      _clearAllInputs();
     });
   }
 
@@ -104,10 +169,29 @@ class _GenerateScreenState extends State<GenerateScreen> {
     });
   }
 
+  void _clearAllInputs() {
+    _textController.clear();
+    _numberController.clear();
+    _websiteController.clear();
+    _locationController.clear();
+    _wifiSsidController.clear();
+    _wifiPassController.clear();
+    _vcardNameController.clear();
+    _vcardPhoneController.clear();
+    _vcardEmailController.clear();
+    _vcardCompanyController.clear();
+    _vcardAddressController.clear();
+    _eventTitleController.clear();
+    _eventLocationController.clear();
+    _eventDateTimeController.clear();
+    _eventNoteController.clear();
+  }
+
   void _selectCategory(QRType type) {
     setState(() {
       _selectedType = type;
       _qrPayload = '';
+      _clearAllInputs();
     });
   }
 
@@ -146,6 +230,17 @@ class _GenerateScreenState extends State<GenerateScreen> {
     _numberController.dispose();
     _websiteController.dispose();
     _locationController.dispose();
+    _wifiSsidController.dispose();
+    _wifiPassController.dispose();
+    _vcardNameController.dispose();
+    _vcardPhoneController.dispose();
+    _vcardEmailController.dispose();
+    _vcardCompanyController.dispose();
+    _vcardAddressController.dispose();
+    _eventTitleController.dispose();
+    _eventLocationController.dispose();
+    _eventDateTimeController.dispose();
+    _eventNoteController.dispose();
     super.dispose();
   }
 
@@ -193,7 +288,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
-  /// Main Created Codes List View (Matching Screenshot 1)
+  /// Main Created Codes List View
   Widget _buildCreatedCodesList() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -281,7 +376,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
-  /// 4-Category Grid Selection View (Matching Screenshot 2 Create layout)
+  /// 7-Category Grid Selection View
   Widget _buildCategoryGrid() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -312,6 +407,10 @@ class _GenerateScreenState extends State<GenerateScreen> {
               _buildCategoryCard(QRType.website, Icons.web_rounded, 'Website'),
               _buildCategoryCard(
                   QRType.location, Icons.location_on_rounded, 'Location'),
+              _buildCategoryCard(QRType.wifi, Icons.wifi_rounded, 'Wi-Fi'),
+              _buildCategoryCard(QRType.vcard, Icons.badge_rounded, 'vCard'),
+              _buildCategoryCard(
+                  QRType.event, Icons.insert_invitation_rounded, 'Thiệp mời'),
             ],
           ),
         ],
@@ -422,6 +521,110 @@ class _GenerateScreenState extends State<GenerateScreen> {
             hintText: 'Nhập địa chỉ hoặc tọa độ (Google Maps)...',
             prefixIcon: Icon(Icons.location_on_rounded),
           ),
+        );
+      case QRType.wifi:
+        return Column(
+          children: [
+            TextField(
+              controller: _wifiSsidController,
+              decoration: const InputDecoration(
+                hintText: 'Tên mạng Wi-Fi (SSID)...',
+                prefixIcon: Icon(Icons.wifi_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _wifiPassController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                hintText: 'Mật khẩu Wi-Fi...',
+                prefixIcon: Icon(Icons.lock_rounded),
+              ),
+            ),
+          ],
+        );
+      case QRType.vcard:
+        return Column(
+          children: [
+            TextField(
+              controller: _vcardNameController,
+              decoration: const InputDecoration(
+                hintText: 'Họ và tên...',
+                prefixIcon: Icon(Icons.person_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _vcardPhoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                hintText: 'Số điện thoại...',
+                prefixIcon: Icon(Icons.phone_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _vcardEmailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                hintText: 'Email...',
+                prefixIcon: Icon(Icons.email_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _vcardCompanyController,
+              decoration: const InputDecoration(
+                hintText: 'Công ty / Chức danh...',
+                prefixIcon: Icon(Icons.business_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _vcardAddressController,
+              decoration: const InputDecoration(
+                hintText: 'Địa chỉ...',
+                prefixIcon: Icon(Icons.location_city_rounded),
+              ),
+            ),
+          ],
+        );
+      case QRType.event:
+        return Column(
+          children: [
+            TextField(
+              controller: _eventTitleController,
+              decoration: const InputDecoration(
+                hintText: 'Tiêu đề thiệp mời / Sự kiện...',
+                prefixIcon: Icon(Icons.insert_invitation_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _eventLocationController,
+              decoration: const InputDecoration(
+                hintText: 'Địa điểm tổ chức...',
+                prefixIcon: Icon(Icons.place_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _eventDateTimeController,
+              decoration: const InputDecoration(
+                hintText: 'Ngày & Giờ (Ví dụ: 20:00 - 25/12/2026)...',
+                prefixIcon: Icon(Icons.event_rounded),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _eventNoteController,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Ghi chú / Lời mời...',
+                prefixIcon: Icon(Icons.notes_rounded),
+              ),
+            ),
+          ],
         );
     }
   }

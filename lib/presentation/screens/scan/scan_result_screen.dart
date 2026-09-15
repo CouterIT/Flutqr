@@ -6,7 +6,7 @@ import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 
-/// Scan Result Screen matching Screenshot 2 design exactly
+/// Scan Result Screen supporting all 7 QR payload types
 class ScanResultScreen extends StatefulWidget {
   final QRDataModel qrData;
 
@@ -32,6 +32,12 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         return 'Number';
       case QRType.location:
         return 'Location';
+      case QRType.wifi:
+        return 'Wi-Fi';
+      case QRType.vcard:
+        return 'vCard';
+      case QRType.event:
+        return 'Thiệp mời';
     }
   }
 
@@ -45,6 +51,12 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         return Icons.phone_rounded;
       case QRType.location:
         return Icons.location_on_rounded;
+      case QRType.wifi:
+        return Icons.wifi_rounded;
+      case QRType.vcard:
+        return Icons.badge_rounded;
+      case QRType.event:
+        return Icons.insert_invitation_rounded;
     }
   }
 
@@ -58,6 +70,12 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         return 'Gọi số điện thoại';
       case QRType.location:
         return 'Mở vị trí\ntrên Google Maps';
+      case QRType.wifi:
+        return 'Sao chép thông tin Wi-Fi';
+      case QRType.vcard:
+        return 'Sao chép danh bạ';
+      case QRType.event:
+        return 'Sao chép thông tin sự kiện';
     }
   }
 
@@ -172,7 +190,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
 
                     const SizedBox(height: 36),
 
-                    // Main Action Text (matching Screenshot 2: "Open URL in google")
+                    // Main Action Text
                     InkWell(
                       onTap: _performMainAction,
                       borderRadius: BorderRadius.circular(12),
@@ -194,7 +212,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
 
                     const SizedBox(height: 40),
 
-                    // Customization Palette Presets Row (Matching Screenshot 2)
+                    // Customization Palette Presets Row
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
@@ -232,7 +250,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
 
                     const SizedBox(height: 32),
 
-                    // URL / Payload details display at bottom (Matching Screenshot 2: "URL : https://...")
+                    // Details display at bottom
                     Align(
                       alignment: Alignment.centerLeft,
                       child: RichText(
@@ -257,7 +275,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w400,
-                                    color: Color(0xFF4285F4), // Blue link color
+                                    color: Color(0xFF4285F4),
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),

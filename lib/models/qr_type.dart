@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../core/constants/app_colors.dart';
 
-/// Enum restricting QR creation to 4 primary types: text, number, website, location
+/// Enum defining supported QR payload types (7 total)
 enum QRType {
   text,
   number,
   website,
   location,
+  wifi,
+  vcard,
+  event,
 }
 
 extension QRTypeExtension on QRType {
@@ -21,6 +24,12 @@ extension QRTypeExtension on QRType {
         return 'Website';
       case QRType.location:
         return 'Location';
+      case QRType.wifi:
+        return 'Wi-Fi';
+      case QRType.vcard:
+        return 'vCard';
+      case QRType.event:
+        return 'Thiệp mời';
     }
   }
 
@@ -34,6 +43,12 @@ extension QRTypeExtension on QRType {
         return Icons.web_rounded;
       case QRType.location:
         return Icons.location_on_rounded;
+      case QRType.wifi:
+        return Icons.wifi_rounded;
+      case QRType.vcard:
+        return Icons.badge_rounded;
+      case QRType.event:
+        return Icons.insert_invitation_rounded;
     }
   }
 
@@ -47,6 +62,12 @@ extension QRTypeExtension on QRType {
         return const Color(0xFF3B82F6);
       case QRType.location:
         return const Color(0xFFEF4444);
+      case QRType.wifi:
+        return const Color(0xFF8B5CF6);
+      case QRType.vcard:
+        return const Color(0xFFF59E0B);
+      case QRType.event:
+        return const Color(0xFFEC4899);
     }
   }
 }

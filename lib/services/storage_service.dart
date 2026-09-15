@@ -16,6 +16,7 @@ class StorageService {
   // Key lưu trữ trong SharedPreferences — version v2 để backward-compatible
   static const String _keyScannedHistory = 'flutqr_scanned_history_v2';
   static const String _keyCreatedCodes = 'flutqr_created_codes_v2';
+  static const String _keyVirusTotalApiKey = 'flutqr_virustotal_api_key';
 
   static SharedPreferences? _prefs;
 
@@ -93,4 +94,18 @@ class StorageService {
   static Future<void> deleteCreatedItem(String id) => _deleteItem(_keyCreatedCodes, id);
   /// Xóa toàn bộ mã đã tạo.
   static Future<void> clearCreatedCodes() => _clearItems(_keyCreatedCodes);
+
+  // ================= VirusTotal Settings =================
+
+  /// Đọc VirusTotal API Key đã lưu.
+  static Future<String> getVirusTotalApiKey() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs?.getString(_keyVirusTotalApiKey) ?? '';
+  }
+
+  /// Lưu VirusTotal API Key.
+  static Future<void> saveVirusTotalApiKey(String apiKey) async {
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs?.setString(_keyVirusTotalApiKey, apiKey.trim());
+  }
 }

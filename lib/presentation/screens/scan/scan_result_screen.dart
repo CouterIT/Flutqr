@@ -8,13 +8,15 @@ import '../../../core/utils/qr_exporter.dart';
 import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
+import '../../../services/virustotal_service.dart';
 import '../../widgets/scan/scan_action_buttons.dart';
+import '../../widgets/scan/virustotal_badge_widget.dart';
 
 /// Screen hiển thị kết quả quét/tạo mã QR.
 ///
 /// Hiển thị: QR code image + loại mã + 2 nút action + nội dung chi tiết.
 /// Action thay đổi theo type QR:
-/// - Website/Location → Mở trình duyệt/maps
+/// - Website/Location → Mở trình duyệt/maps (có tích hợp kiểm tra an toàn VirusTotal)
 /// - Number → Gọi điện
 /// - Image → Chia sẻ ảnh gốc
 /// - Text/WiFi/vCard/Event → Sao chép nội dung
@@ -31,6 +33,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   /// GlobalKey gắn với RepaintBoundary — dùng để capture QR widget thành PNG.
   final GlobalKey _qrBoundaryKey = GlobalKey();
   bool _isSaving = false;
+  VirusTotalReport? _virusTotalReport;
 
   /// Shortcut truy cập type QR — tránh lặp `widget.qrData.type` nhiều lần.
   QRType get _type => widget.qrData.type;
@@ -41,7 +44,8 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
       case QRType.website: return 'Mở Web';
       case QRType.number: return 'Gọi điện';
       case QRType.location: return 'Mở Maps';
-      case QRType.image: return 'Chia sẻ ảnh';
+      case QRType.image:
+        return widget.qrData.rawValue.startsWith('http') ? 'Xem ảnh Online' : 'Chia sẻ ảnh';
       default: return 'Sao chép';
     }
   }
@@ -52,7 +56,8 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
       case QRType.website: return Icons.open_in_browser_rounded;
       case QRType.number: return Icons.call_rounded;
       case QRType.location: return Icons.map_rounded;
-      case QRType.image: return Icons.share_rounded;
+      case QRType.image:
+        return widget.qrData.rawValue.startsWith('http') ? Icons.open_in_browser_rounded : Icons.share_rounded;
       default: return Icons.copy_rounded;
     }
   }
@@ -60,11 +65,58 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
   /// Dispatch action chính theo loại QR.
   ///
   /// Mỗi loại QR có hành vi khác nhau khi người dùng nhấn nút action.
-  /// Website/location mở URL, number gọi điện, image share file ảnh,
+  /// Website/location/image online mở URL (có cảnh báo VirusTotal nếu nguy hiểm),
+  /// number gọi điện, image share file ảnh,
   /// text/wifi/vcard/event copy nội dung vào clipboard.
-  void _performMainAction() {
-    if (_type == QRType.website || _type == QRType.location) {
-      QRService.launchURL(widget.qrData.rawValue);
+  void _performMainAction() async {
+    final isUrlType = _type == QRType.website || _type == QRType.location || (_type == QRType.image && widget.qrData.rawValue.startsWith('http'));
+
+    if (isUrlType) {
+      final report = _virusTotalReport;
+      if (report != null && (report.isMalicious || report.isSuspicious)) {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.gpp_bad_rounded, color: Colors.red, size: 28),
+                SizedBox(width: 8),
+                Text('Cảnh báo nguy hiểm!', style: TextStyle(color: Colors.red, fontSize: 18, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            content: Text(
+              'VirusTotal phát hiện đường link này có nguy cơ lừa đảo (phishing) hoặc chứa mã độc.\n\n'
+              'Chi tiết: ${report.message}\n\n'
+              'Bạn có chắc chắn vẫn muốn tiếp tục truy cập không?',
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Hủy (Khuyên dùng)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Vẫn tiếp tục'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirm != true) return;
+      }
+
+      final success = await QRService.launchURL(widget.qrData.rawValue);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể mở trình duyệt. Vui lòng kiểm tra lại liên kết hoặc trình duyệt thiết bị.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } else if (_type == QRType.number) {
       QRService.launchPhoneDialer(widget.qrData.rawValue);
     } else if (_type == QRType.image) {
@@ -143,7 +195,9 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                 children: [
                   Icon(_type.icon, color: const Color(0xFF6BB5C5), size: 24),
                   const SizedBox(width: 16),
-                  Text(_type.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                  Expanded(
+                    child: Text(_type.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),
+                  ),
                 ],
               ),
             ),
@@ -180,6 +234,17 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                       onSavePressed: _saveQrImageToDevice,
                       onActionPressed: _performMainAction,
                     ),
+                    if (isUrl) ...[
+                      const SizedBox(height: 24),
+                      VirusTotalBadgeWidget(
+                        url: widget.qrData.rawValue,
+                        onReportLoaded: (report) {
+                          setState(() {
+                            _virusTotalReport = report;
+                          });
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 32),
                     // Hiển thị nội dung QR gốc — nhấn để trigger action chính
                     Column(

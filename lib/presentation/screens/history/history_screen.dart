@@ -7,7 +7,7 @@ import '../../../models/qr_type.dart';
 import '../../../services/storage_service.dart';
 import '../scan/scan_result_screen.dart';
 
-/// History Screen displaying ONLY scanned QR items (Matching Screenshot 3)
+/// History Screen displaying scanned items with Long-Press Selection & Batch Delete
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -18,6 +18,10 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   List<QRDataModel> _historyList = [];
   bool _isLoading = true;
+
+  // Selection Mode State
+  bool _isSelectionMode = false;
+  final Set<String> _selectedIds = {};
 
   @override
   void initState() {
@@ -34,21 +38,69 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _historyList = list;
         _isLoading = false;
+        // Clean up any deleted selection IDs
+        _selectedIds.removeWhere((id) => !list.any((item) => item.id == id));
+        if (_selectedIds.isEmpty) {
+          _isSelectionMode = false;
+        }
       });
     }
   }
 
-  Future<void> _deleteItem(String id) async {
-    await StorageService.deleteScannedItem(id);
-    _loadHistory();
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+        if (_selectedIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedIds.add(id);
+      }
+    });
   }
 
-  Future<void> _clearHistory() async {
+  void _enterSelectionMode(String initialId) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedIds.clear();
+      _selectedIds.add(initialId);
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedIds.length == _historyList.length) {
+        _selectedIds.clear();
+        _isSelectionMode = false;
+      } else {
+        _selectedIds.addAll(_historyList.map((e) => e.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedItems() async {
+    if (_selectedIds.isEmpty) return;
+
+    final int count = _selectedIds.length;
+    final bool isAll = count == _historyList.length;
+
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Xóa lịch sử'),
-        content: const Text('Bạn có chắc chắn muốn xóa toàn bộ lịch sử đã quét?'),
+        title: Text(isAll ? 'Xóa tất cả lịch sử' : 'Xóa mục đã chọn'),
+        content: Text(
+          isAll
+              ? 'Bạn có chắc chắn muốn xóa toàn bộ $_historyList.length lịch sử đã quét?'
+              : 'Bạn có chắc chắn muốn xóa $count mục đã chọn?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -57,14 +109,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Xác nhận'),
+            child: const Text('Xóa'),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      await StorageService.clearScannedHistory();
+      for (final id in _selectedIds) {
+        await StorageService.deleteScannedItem(id);
+      }
+      _exitSelectionMode();
       _loadHistory();
     }
   }
@@ -75,26 +130,50 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAllSelected =
+        _historyList.isNotEmpty && _selectedIds.length == _historyList.length;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
-          tooltip: 'Xóa lịch sử',
-          onPressed: _historyList.isNotEmpty ? _clearHistory : null,
-        ),
-        title: const Text(
-          'History',
-          style: TextStyle(
+        leading: _isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                tooltip: 'Hủy chọn',
+                onPressed: _exitSelectionMode,
+              )
+            : null,
+        title: Text(
+          _isSelectionMode ? 'Đã chọn ${_selectedIds.length}' : 'History',
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
         centerTitle: true,
+        actions: [
+          if (_isSelectionMode) ...[
+            IconButton(
+              icon: Icon(
+                isAllSelected
+                    ? Icons.select_all_rounded
+                    : Icons.deselect_rounded,
+                color: Colors.white,
+              ),
+              tooltip: isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả',
+              onPressed: _toggleSelectAll,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_rounded, color: Colors.white),
+              tooltip: 'Xóa mục đã chọn',
+              onPressed: _deleteSelectedItems,
+            ),
+          ],
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -125,17 +204,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   itemBuilder: (context, index) {
                     final item = _historyList[index];
-                    return Dismissible(
-                      key: Key(item.id),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        color: AppColors.error,
-                        child: const Icon(Icons.delete_rounded,
-                            color: Colors.white),
-                      ),
-                      onDismissed: (_) => _deleteItem(item.id),
+                    final bool isSelected = _selectedIds.contains(item.id);
+
+                    return Container(
+                      color: isSelected
+                          ? AppColors.primary.withValues(alpha: 0.08)
+                          : Colors.transparent,
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
@@ -162,18 +236,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             color: AppColors.textMuted,
                           ),
                         ),
-                        trailing: const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 16,
-                          color: Color(0xFFD0D0D0),
-                        ),
+                        trailing: _isSelectionMode
+                            ? Checkbox(
+                                value: isSelected,
+                                activeColor: AppColors.primary,
+                                onChanged: (_) => _toggleSelection(item.id),
+                              )
+                            : const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 16,
+                                color: Color(0xFFD0D0D0),
+                              ),
+                        onLongPress: () {
+                          if (!_isSelectionMode) {
+                            _enterSelectionMode(item.id);
+                          } else {
+                            _toggleSelection(item.id);
+                          }
+                        },
                         onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  ScanResultScreen(qrData: item),
-                            ),
-                          );
+                          if (_isSelectionMode) {
+                            _toggleSelection(item.id);
+                          } else {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ScanResultScreen(qrData: item),
+                              ),
+                            );
+                          }
                         },
                       ),
                     );

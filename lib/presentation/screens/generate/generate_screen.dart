@@ -10,7 +10,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/qr_view_box.dart';
 import '../scan/scan_result_screen.dart';
 
-/// Created Codes Screen with 7 Creation Categories
+/// Created Codes Screen with Long-Press Selection & Batch Delete
 class GenerateScreen extends StatefulWidget {
   const GenerateScreen({super.key});
 
@@ -21,6 +21,10 @@ class GenerateScreen extends StatefulWidget {
 class _GenerateScreenState extends State<GenerateScreen> {
   List<QRDataModel> _createdCodesList = [];
   bool _isLoading = true;
+
+  // Selection Mode State
+  bool _isSelectionMode = false;
+  final Set<String> _selectedIds = {};
 
   // Creation State
   bool _isCreating = false;
@@ -85,7 +89,88 @@ class _GenerateScreenState extends State<GenerateScreen> {
       setState(() {
         _createdCodesList = list;
         _isLoading = false;
+        _selectedIds.removeWhere((id) => !list.any((item) => item.id == id));
+        if (_selectedIds.isEmpty) {
+          _isSelectionMode = false;
+        }
       });
+    }
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+        if (_selectedIds.isEmpty) {
+          _isSelectionMode = false;
+        }
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _enterSelectionMode(String initialId) {
+    setState(() {
+      _isSelectionMode = true;
+      _selectedIds.clear();
+      _selectedIds.add(initialId);
+    });
+  }
+
+  void _exitSelectionMode() {
+    setState(() {
+      _isSelectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  void _toggleSelectAll() {
+    setState(() {
+      if (_selectedIds.length == _createdCodesList.length) {
+        _selectedIds.clear();
+        _isSelectionMode = false;
+      } else {
+        _selectedIds.addAll(_createdCodesList.map((e) => e.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedItems() async {
+    if (_selectedIds.isEmpty) return;
+
+    final int count = _selectedIds.length;
+    final bool isAll = count == _createdCodesList.length;
+
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isAll ? 'Xóa tất cả mã đã tạo' : 'Xóa mã đã chọn'),
+        content: Text(
+          isAll
+              ? 'Bạn có chắc chắn muốn xóa toàn bộ ${_createdCodesList.length} mã đã tạo?'
+              : 'Bạn có chắc chắn muốn xóa $count mã đã chọn?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xóa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      for (final id in _selectedIds) {
+        await StorageService.deleteCreatedItem(id);
+      }
+      _exitSelectionMode();
+      _loadCreatedCodes();
     }
   }
 
@@ -215,11 +300,6 @@ class _GenerateScreenState extends State<GenerateScreen> {
     }
   }
 
-  Future<void> _deleteCreatedItem(String id) async {
-    await StorageService.deleteCreatedItem(id);
-    _loadCreatedCodes();
-  }
-
   String _formatTimestamp(DateTime dt) {
     return DateFormat('dd-MM-yyyy hh:mm a').format(dt);
   }
@@ -246,6 +326,9 @@ class _GenerateScreenState extends State<GenerateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAllSelected = _createdCodesList.isNotEmpty &&
+        _selectedIds.length == _createdCodesList.length;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -259,11 +342,19 @@ class _GenerateScreenState extends State<GenerateScreen> {
                     ? () => setState(() => _selectedType = null)
                     : _cancelCreationFlow,
               )
-            : null,
+            : (_isSelectionMode
+                ? IconButton(
+                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    tooltip: 'Hủy chọn',
+                    onPressed: _exitSelectionMode,
+                  )
+                : null),
         title: Text(
           _isCreating
               ? (_selectedType != null ? _selectedType!.displayName : 'Create')
-              : 'Created codes',
+              : (_isSelectionMode
+                  ? 'Đã chọn ${_selectedIds.length}'
+                  : 'Created codes'),
           style: const TextStyle(
             color: Colors.white,
             fontSize: 20,
@@ -272,12 +363,29 @@ class _GenerateScreenState extends State<GenerateScreen> {
         ),
         centerTitle: true,
         actions: [
-          if (!_isCreating)
+          if (!_isCreating && !_isSelectionMode)
             IconButton(
               icon: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
               tooltip: 'Tạo mã QR mới',
               onPressed: _openCreationFlow,
             ),
+          if (!_isCreating && _isSelectionMode) ...[
+            IconButton(
+              icon: Icon(
+                isAllSelected
+                    ? Icons.select_all_rounded
+                    : Icons.deselect_rounded,
+                color: Colors.white,
+              ),
+              tooltip: isAllSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả',
+              onPressed: _toggleSelectAll,
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_rounded, color: Colors.white),
+              tooltip: 'Xóa mục đã chọn',
+              onPressed: _deleteSelectedItems,
+            ),
+          ],
         ],
       ),
       body: _isCreating
@@ -288,7 +396,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
-  /// Main Created Codes List View
+  /// Main Created Codes List View (Matching Screenshot 1)
   Widget _buildCreatedCodesList() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -322,16 +430,12 @@ class _GenerateScreenState extends State<GenerateScreen> {
       ),
       itemBuilder: (context, index) {
         final item = _createdCodesList[index];
-        return Dismissible(
-          key: Key(item.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            color: AppColors.error,
-            child: const Icon(Icons.delete_rounded, color: Colors.white),
-          ),
-          onDismissed: (_) => _deleteCreatedItem(item.id),
+        final bool isSelected = _selectedIds.contains(item.id);
+
+        return Container(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : Colors.transparent,
           child: ListTile(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -358,17 +462,34 @@ class _GenerateScreenState extends State<GenerateScreen> {
                 color: AppColors.textMuted,
               ),
             ),
-            trailing: const Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-              color: Color(0xFFD0D0D0),
-            ),
+            trailing: _isSelectionMode
+                ? Checkbox(
+                    value: isSelected,
+                    activeColor: AppColors.primary,
+                    onChanged: (_) => _toggleSelection(item.id),
+                  )
+                : const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 16,
+                    color: Color(0xFFD0D0D0),
+                  ),
+            onLongPress: () {
+              if (!_isSelectionMode) {
+                _enterSelectionMode(item.id);
+              } else {
+                _toggleSelection(item.id);
+              }
+            },
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => ScanResultScreen(qrData: item),
-                ),
-              );
+              if (_isSelectionMode) {
+                _toggleSelection(item.id);
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ScanResultScreen(qrData: item),
+                  ),
+                );
+              }
             },
           ),
         );

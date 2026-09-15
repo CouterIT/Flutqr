@@ -19,13 +19,21 @@ class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  State<HistoryScreen> createState() => HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class HistoryScreenState extends State<HistoryScreen> {
   List<QRDataModel> _historyList = [];
   bool _isLoading = true;
   final SelectionController _sel = SelectionController();
+
+  /// Reset state lịch sử (thoát chế độ chọn nhiều + làm mới danh sách).
+  void resetState() {
+    if (mounted) {
+      _sel.exit();
+      _loadHistory();
+    }
+  }
 
   @override
   void initState() {

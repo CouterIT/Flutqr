@@ -104,6 +104,11 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
   /// - event: chuẩn iCalendar VEVENT
   /// - image: `IMG:/path/to/image`
   void _updatePayload() {
+    if (widget.type == QRType.image) {
+      widget.onPayloadChanged(_selectedImagePath != null ? 'IMG:$_selectedImagePath' : '');
+      return;
+    }
+
     final c = _controllers[widget.type]!;
     String payload = '';
 
@@ -144,7 +149,7 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
           );
         }
       case QRType.image:
-        payload = _selectedImagePath != null ? 'IMG:$_selectedImagePath' : '';
+        break;
     }
 
     // Gửi payload về parent để update preview QR realtime
@@ -187,6 +192,22 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
 
   /// Xây dựng form input phù hợp với loại QR đang chọn.
   Widget _buildInput() {
+    if (widget.type == QRType.image) {
+      return Column(children: [
+        // Hiển thị preview ảnh nếu đã chọn
+        if (_selectedImagePath != null) ...[
+          ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(_selectedImagePath!), height: 160, width: double.infinity, fit: BoxFit.cover)),
+          const SizedBox(height: 16),
+        ],
+        CustomButton(
+          text: _selectedImagePath == null ? 'Chọn ảnh từ thư viện' : 'Đổi ảnh khác',
+          icon: Icons.photo_library_rounded,
+          isSecondary: true,
+          onPressed: _pickImage,
+        ),
+      ]);
+    }
+
     final c = _controllers[widget.type]!;
     switch (widget.type) {
       case QRType.text:
@@ -337,19 +358,7 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
           ),
         ]);
       case QRType.image:
-        return Column(children: [
-          // Hiển thị preview ảnh nếu đã chọn
-          if (_selectedImagePath != null) ...[
-            ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(_selectedImagePath!), height: 160, width: double.infinity, fit: BoxFit.cover)),
-            const SizedBox(height: 16),
-          ],
-          CustomButton(
-            text: _selectedImagePath == null ? 'Chọn ảnh từ thư viện' : 'Đổi ảnh khác',
-            icon: Icons.photo_library_rounded,
-            isSecondary: true,
-            onPressed: _pickImage,
-          ),
-        ]);
+        return const SizedBox.shrink();
     }
   }
 }

@@ -22,10 +22,10 @@ class GenerateScreen extends StatefulWidget {
   const GenerateScreen({super.key});
 
   @override
-  State<GenerateScreen> createState() => _GenerateScreenState();
+  State<GenerateScreen> createState() => GenerateScreenState();
 }
 
-class _GenerateScreenState extends State<GenerateScreen> {
+class GenerateScreenState extends State<GenerateScreen> {
   /// GlobalKey cho RepaintBoundary trong preview QR — dùng khi export PNG.
   final GlobalKey _previewQrKey = GlobalKey();
   List<QRDataModel> _createdCodesList = [];
@@ -36,6 +36,19 @@ class _GenerateScreenState extends State<GenerateScreen> {
   bool _isCreating = false; // Đang trong flow tạo mã
   QRType? _selectedType; // Loại QR đang chọn (null = chưa chọn)
   String _qrPayload = ''; // Nội dung QR hiện tại để preview
+
+  /// Reset toàn bộ state của screen về vị trí ban đầu (danh sách mã đã tạo).
+  void resetState() {
+    if (mounted) {
+      _sel.exit();
+      setState(() {
+        _isCreating = false;
+        _selectedType = null;
+        _qrPayload = '';
+      });
+      _loadCreatedCodes();
+    }
+  }
 
   @override
   void initState() {

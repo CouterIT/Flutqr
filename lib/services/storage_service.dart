@@ -10,102 +10,59 @@ class StorageService {
 
   static SharedPreferences? _prefs;
 
-  /// Initialize SharedPreferences instance
   static Future<void> init() async {
     _prefs = await SharedPreferences.getInstance();
   }
 
-  // ================= SCANNED HISTORY =================
+  // ================= Generic Private Helpers =================
 
-  /// Get stored scanned history list
-  static Future<List<QRDataModel>> getScannedHistory() async {
+  static Future<List<QRDataModel>> _getItems(String key) async {
     _prefs ??= await SharedPreferences.getInstance();
-    final String? jsonString = _prefs?.getString(_keyScannedHistory);
-    if (jsonString == null || jsonString.isEmpty) return [];
-
+    final String? json = _prefs?.getString(key);
+    if (json == null || json.isEmpty) return [];
     try {
-      final List<dynamic> jsonList = jsonDecode(jsonString);
-      return jsonList
-          .map((item) => QRDataModel.fromMap(item as Map<String, dynamic>))
+      return (jsonDecode(json) as List)
+          .map((e) => QRDataModel.fromMap(e as Map<String, dynamic>))
           .toList();
     } catch (_) {
       return [];
     }
   }
 
-  /// Save scanned QR item to history (scanned items ONLY)
-  static Future<void> saveScannedItem(QRDataModel item) async {
-    final history = await getScannedHistory();
-
-    // Remove duplicates if same raw value exists
-    history.removeWhere((element) => element.rawValue == item.rawValue);
-
-    // Insert at the beginning of the list
-    history.insert(0, item);
-
-    await _saveList(_keyScannedHistory, history);
-  }
-
-  /// Delete single scanned item from history by ID
-  static Future<void> deleteScannedItem(String id) async {
-    final history = await getScannedHistory();
-    history.removeWhere((element) => element.id == id);
-    await _saveList(_keyScannedHistory, history);
-  }
-
-  /// Clear entire scanned history
-  static Future<void> clearScannedHistory() async {
-    _prefs ??= await SharedPreferences.getInstance();
-    await _prefs?.remove(_keyScannedHistory);
-  }
-
-  // ================= CREATED CODES =================
-
-  /// Get stored created codes list
-  static Future<List<QRDataModel>> getCreatedCodes() async {
-    _prefs ??= await SharedPreferences.getInstance();
-    final String? jsonString = _prefs?.getString(_keyCreatedCodes);
-    if (jsonString == null || jsonString.isEmpty) return [];
-
-    try {
-      final List<dynamic> jsonList = jsonDecode(jsonString);
-      return jsonList
-          .map((item) => QRDataModel.fromMap(item as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  /// Save created QR item to created list
-  static Future<void> saveCreatedItem(QRDataModel item) async {
-    final list = await getCreatedCodes();
-
-    list.removeWhere((element) => element.rawValue == item.rawValue);
+  static Future<void> _upsertItem(String key, QRDataModel item) async {
+    final list = await _getItems(key);
+    list.removeWhere((e) => e.rawValue == item.rawValue);
     list.insert(0, item);
-
-    await _saveList(_keyCreatedCodes, list);
+    await _saveList(key, list);
   }
 
-  /// Delete single created item by ID
-  static Future<void> deleteCreatedItem(String id) async {
-    final list = await getCreatedCodes();
-    list.removeWhere((element) => element.id == id);
-    await _saveList(_keyCreatedCodes, list);
+  static Future<void> _deleteItem(String key, String id) async {
+    final list = await _getItems(key);
+    list.removeWhere((e) => e.id == id);
+    await _saveList(key, list);
   }
 
-  /// Clear all created codes
-  static Future<void> clearCreatedCodes() async {
+  static Future<void> _clearItems(String key) async {
     _prefs ??= await SharedPreferences.getInstance();
-    await _prefs?.remove(_keyCreatedCodes);
+    await _prefs?.remove(key);
   }
-
-  // ================= HELPER =================
 
   static Future<void> _saveList(String key, List<QRDataModel> list) async {
     _prefs ??= await SharedPreferences.getInstance();
-    final String jsonString =
-        jsonEncode(list.map((item) => item.toMap()).toList());
-    await _prefs?.setString(key, jsonString);
+    await _prefs?.setString(key, jsonEncode(list.map((e) => e.toMap()).toList()));
   }
+
+  // ================= Scanned History =================
+
+  static Future<List<QRDataModel>> getScannedHistory() => _getItems(_keyScannedHistory);
+  static Future<void> saveScannedItem(QRDataModel item) => _upsertItem(_keyScannedHistory, item);
+  static Future<void> deleteScannedItem(String id) => _deleteItem(_keyScannedHistory, id);
+  static Future<void> clearScannedHistory() => _clearItems(_keyScannedHistory);
+
+  // ================= Created Codes =================
+
+  static Future<List<QRDataModel>> getCreatedCodes() => _getItems(_keyCreatedCodes);
+  static Future<void> saveCreatedItem(QRDataModel item) => _upsertItem(_keyCreatedCodes, item);
+  static Future<void> deleteCreatedItem(String id) => _deleteItem(_keyCreatedCodes, id);
+  static Future<void> clearCreatedCodes() => _clearItems(_keyCreatedCodes);
 }

@@ -18,7 +18,7 @@ extension QRTypeExtension on QRType {
   String get displayName {
     switch (this) {
       case QRType.text:
-        return 'Text';
+        return 'Văn bản';
       case QRType.number:
         return 'Number';
       case QRType.website:

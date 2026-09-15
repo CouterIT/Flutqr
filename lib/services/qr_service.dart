@@ -14,7 +14,9 @@ class QRService {
     final clean = rawValue.trim();
     final lower = clean.toLowerCase();
 
-    if (clean.startsWith('WIFI:') || clean.startsWith('wifi:')) {
+    if (clean.startsWith('IMG:') || clean.startsWith('file://') || lower.endsWith('.jpg') || lower.endsWith('.png') || lower.endsWith('.jpeg')) {
+      return QRType.image;
+    } else if (clean.startsWith('WIFI:') || clean.startsWith('wifi:')) {
       return QRType.wifi;
     } else if (clean.startsWith('BEGIN:VCARD')) {
       return QRType.vcard;
@@ -103,6 +105,9 @@ class QRService {
         break;
       case QRType.event:
         title = 'Thiệp mời / Sự kiện';
+        break;
+      case QRType.image:
+        title = 'QR Ảnh';
         break;
       case QRType.text:
         title = rawValue.length > 30 ? '${rawValue.substring(0, 30)}...' : rawValue;

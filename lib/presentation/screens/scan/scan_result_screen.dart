@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -6,7 +7,7 @@ import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 
-/// Scan Result Screen matching Screenshot 2 design without color palette row
+/// Scan Result Screen supporting all 8 QR payload types
 class ScanResultScreen extends StatelessWidget {
   final QRDataModel qrData;
 
@@ -31,6 +32,8 @@ class ScanResultScreen extends StatelessWidget {
         return 'vCard';
       case QRType.event:
         return 'Thiệp mời';
+      case QRType.image:
+        return 'QR Ảnh';
     }
   }
 
@@ -50,6 +53,8 @@ class ScanResultScreen extends StatelessWidget {
         return Icons.badge_rounded;
       case QRType.event:
         return Icons.insert_invitation_rounded;
+      case QRType.image:
+        return Icons.image_rounded;
     }
   }
 
@@ -61,6 +66,8 @@ class ScanResultScreen extends StatelessWidget {
         return 'Gọi số điện thoại\n(Phone Dialer)';
       case QRType.location:
         return 'Mở vị trí\ntrên Google Maps';
+      case QRType.image:
+        return 'Chia sẻ mã QR Ảnh';
       case QRType.text:
         return 'Sao chép văn bản';
       case QRType.wifi:
@@ -77,6 +84,8 @@ class ScanResultScreen extends StatelessWidget {
       QRService.launchURL(qrData.rawValue);
     } else if (qrData.type == QRType.number) {
       QRService.launchPhoneDialer(qrData.rawValue);
+    } else if (qrData.type == QRType.image) {
+      QRService.shareContent(qrData.rawValue, subject: 'Chia sẻ QR Ảnh');
     } else {
       QRService.copyToClipboard(qrData.rawValue);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -90,6 +99,11 @@ class ScanResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String imageFilePath = qrData.rawValue.replaceFirst('IMG:', '');
+    final bool isLocalFileImage = qrData.type == QRType.image &&
+        imageFilePath.isNotEmpty &&
+        File(imageFilePath).existsSync();
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -185,6 +199,22 @@ class ScanResultScreen extends StatelessWidget {
 
                     const SizedBox(height: 36),
 
+                    // Image Preview Thumbnail if local file image
+                    if (isLocalFileImage) ...[
+                      Center(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.file(
+                            File(imageFilePath),
+                            height: 180,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
                     // Main Action Text (e.g. "Open URL in google")
                     Center(
                       child: InkWell(
@@ -209,7 +239,7 @@ class ScanResultScreen extends StatelessWidget {
 
                     const SizedBox(height: 48),
 
-                    // URL / Payload details display at bottom with aligned layout
+                    // Payload details display at bottom
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -232,7 +262,7 @@ class ScanResultScreen extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w400,
-                              color: Color(0xFF4285F4), // Blue link color
+                              color: Color(0xFF4285F4),
                               decoration: TextDecoration.underline,
                               height: 1.35,
                             ),

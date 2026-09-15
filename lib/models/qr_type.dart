@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants/app_colors.dart';
 
-/// Enum defining supported QR payload types (7 total)
+/// Enum defining supported QR payload types (8 total)
 enum QRType {
   text,
   number,
@@ -11,6 +11,7 @@ enum QRType {
   wifi,
   vcard,
   event,
+  image,
 }
 
 extension QRTypeExtension on QRType {
@@ -30,6 +31,8 @@ extension QRTypeExtension on QRType {
         return 'vCard';
       case QRType.event:
         return 'Thiệp mời';
+      case QRType.image:
+        return 'QR Ảnh';
     }
   }
 
@@ -49,6 +52,8 @@ extension QRTypeExtension on QRType {
         return Icons.badge_rounded;
       case QRType.event:
         return Icons.insert_invitation_rounded;
+      case QRType.image:
+        return Icons.image_rounded;
     }
   }
 
@@ -68,6 +73,8 @@ extension QRTypeExtension on QRType {
         return const Color(0xFFF59E0B);
       case QRType.event:
         return const Color(0xFFEC4899);
+      case QRType.image:
+        return const Color(0xFFE11D48);
     }
   }
 }

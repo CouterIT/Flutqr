@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
@@ -10,7 +12,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/qr_view_box.dart';
 import '../scan/scan_result_screen.dart';
 
-/// Created Codes Screen with Long-Press Selection & Batch Delete
+/// Created Codes Screen with 8 Creation Categories (including Image QR)
 class GenerateScreen extends StatefulWidget {
   const GenerateScreen({super.key});
 
@@ -29,6 +31,10 @@ class _GenerateScreenState extends State<GenerateScreen> {
   // Creation State
   bool _isCreating = false;
   QRType? _selectedType;
+
+  // Image Picker
+  final ImagePicker _imagePicker = ImagePicker();
+  String? _selectedImagePath;
 
   // Input Controllers
   final TextEditingController _textController = TextEditingController();
@@ -233,14 +239,41 @@ class _GenerateScreenState extends State<GenerateScreen> {
             _qrPayload = '';
           }
           break;
+        case QRType.image:
+          if (_selectedImagePath != null) {
+            _qrPayload = 'IMG:${_selectedImagePath!}';
+          } else {
+            _qrPayload = '';
+          }
+          break;
       }
     });
+  }
+
+  Future<void> _pickImageForQr() async {
+    try {
+      final XFile? file =
+          await _imagePicker.pickImage(source: ImageSource.gallery);
+      if (file != null) {
+        setState(() {
+          _selectedImagePath = file.path;
+          _updatePayload();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể chọn ảnh: $e')),
+        );
+      }
+    }
   }
 
   void _openCreationFlow() {
     setState(() {
       _isCreating = true;
       _selectedType = null;
+      _selectedImagePath = null;
       _qrPayload = '';
       _clearAllInputs();
     });
@@ -250,6 +283,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     setState(() {
       _isCreating = false;
       _selectedType = null;
+      _selectedImagePath = null;
       _qrPayload = '';
     });
   }
@@ -275,6 +309,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
   void _selectCategory(QRType type) {
     setState(() {
       _selectedType = type;
+      _selectedImagePath = null;
       _qrPayload = '';
       _clearAllInputs();
     });
@@ -396,7 +431,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
-  /// Main Created Codes List View (Matching Screenshot 1)
+  /// Main Created Codes List View
   Widget _buildCreatedCodesList() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -497,7 +532,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
-  /// 7-Category Grid Selection View
+  /// 8-Category Grid Selection View (Including Image QR)
   Widget _buildCategoryGrid() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -532,6 +567,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
               _buildCategoryCard(QRType.vcard, Icons.badge_rounded, 'vCard'),
               _buildCategoryCard(
                   QRType.event, Icons.insert_invitation_rounded, 'Thiệp mời'),
+              _buildCategoryCard(QRType.image, Icons.image_rounded, 'QR Ảnh'),
             ],
           ),
         ],
@@ -744,6 +780,31 @@ class _GenerateScreenState extends State<GenerateScreen> {
                 hintText: 'Ghi chú / Lời mời...',
                 prefixIcon: Icon(Icons.notes_rounded),
               ),
+            ),
+          ],
+        );
+      case QRType.image:
+        return Column(
+          children: [
+            if (_selectedImagePath != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.file(
+                  File(_selectedImagePath!),
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            CustomButton(
+              text: _selectedImagePath == null
+                  ? 'Chọn ảnh từ thư viện'
+                  : 'Đổi ảnh khác',
+              icon: Icons.photo_library_rounded,
+              isSecondary: true,
+              onPressed: _pickImageForQr,
             ),
           ],
         );

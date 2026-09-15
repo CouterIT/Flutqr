@@ -10,7 +10,14 @@ import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 import '../../widgets/scan/scan_action_buttons.dart';
 
-/// Scan Result Screen with 2 side-by-side action buttons under QR code
+/// Screen hiển thị kết quả quét/tạo mã QR.
+///
+/// Hiển thị: QR code image + loại mã + 2 nút action + nội dung chi tiết.
+/// Action thay đổi theo type QR:
+/// - Website/Location → Mở trình duyệt/maps
+/// - Number → Gọi điện
+/// - Image → Chia sẻ ảnh gốc
+/// - Text/WiFi/vCard/Event → Sao chép nội dung
 class ScanResultScreen extends StatefulWidget {
   final QRDataModel qrData;
 
@@ -21,11 +28,14 @@ class ScanResultScreen extends StatefulWidget {
 }
 
 class _ScanResultScreenState extends State<ScanResultScreen> {
+  /// GlobalKey gắn với RepaintBoundary — dùng để capture QR widget thành PNG.
   final GlobalKey _qrBoundaryKey = GlobalKey();
   bool _isSaving = false;
 
+  /// Shortcut truy cập type QR — tránh lặp `widget.qrData.type` nhiều lần.
   QRType get _type => widget.qrData.type;
 
+  /// Label cho nút action chính — thay đổi theo loại QR.
   String get _secondaryActionLabel {
     switch (_type) {
       case QRType.website: return 'Mở Web';
@@ -36,6 +46,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     }
   }
 
+  /// Icon cho nút action chính — đồng bộ với label.
   IconData get _secondaryActionIcon {
     switch (_type) {
       case QRType.website: return Icons.open_in_browser_rounded;
@@ -46,12 +57,18 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     }
   }
 
+  /// Dispatch action chính theo loại QR.
+  ///
+  /// Mỗi loại QR có hành vi khác nhau khi người dùng nhấn nút action.
+  /// Website/location mở URL, number gọi điện, image share file ảnh,
+  /// text/wifi/vcard/event copy nội dung vào clipboard.
   void _performMainAction() {
     if (_type == QRType.website || _type == QRType.location) {
       QRService.launchURL(widget.qrData.rawValue);
     } else if (_type == QRType.number) {
       QRService.launchPhoneDialer(widget.qrData.rawValue);
     } else if (_type == QRType.image) {
+      // Thử share file ảnh gốc trước, nếu file không tồn tại thì share QR PNG
       final filePath = widget.qrData.rawValue.replaceFirst('IMG:', '');
       final imageFile = File(filePath);
       if (imageFile.existsSync()) {
@@ -60,6 +77,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
         QrExporter.shareQrImage(_qrBoundaryKey, text: 'Mã QR Ảnh từ FlutQR');
       }
     } else {
+      // Text, WiFi, vCard, event → copy nội dung vào clipboard
       QRService.copyToClipboard(widget.qrData.rawValue);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã sao chép nội dung!'), duration: Duration(seconds: 2)),
@@ -67,10 +85,15 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     }
   }
 
+  /// Chia sẻ file PNG của mã QR qua native share sheet.
   Future<void> _shareQrImageFile() async {
     await QrExporter.shareQrImage(_qrBoundaryKey, text: 'Mã QR (${_type.displayName}): ${widget.qrData.title}');
   }
 
+  /// Lưu file PNG của mã QR vào thư viện ảnh thiết bị.
+  ///
+  /// Flow: set loading → capture PNG → save to gallery → hiện SnackBar kết quả.
+  /// Nếu lưu thành công, SnackBar sẽ có nút "Chia sẻ" để user share ngay.
   Future<void> _saveQrImageToDevice() async {
     setState(() => _isSaving = true);
     final isSuccess = await QrExporter.saveQrImageToDevice(_qrBoundaryKey, customName: _type.displayName);
@@ -89,6 +112,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Website và location hiển thị "URL :", các loại khác hiển thị "Nội dung :"
     final isUrl = _type == QRType.website || _type == QRType.location;
 
     return Scaffold(
@@ -110,6 +134,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Banner hiển thị loại QR (icon + tên)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -129,6 +154,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 36),
+                    // QR code wrapped trong RepaintBoundary để capture PNG khi share/lưu
                     Center(
                       child: RepaintBoundary(
                         key: _qrBoundaryKey,
@@ -146,6 +172,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    // 2 nút action: "Lưu ảnh QR" + action chính theo type
                     ScanActionButtons(
                       isSaving: _isSaving,
                       secondaryActionLabel: _secondaryActionLabel,
@@ -154,6 +181,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                       onActionPressed: _performMainAction,
                     ),
                     const SizedBox(height: 32),
+                    // Hiển thị nội dung QR gốc — nhấn để trigger action chính
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

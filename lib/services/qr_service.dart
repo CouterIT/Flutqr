@@ -5,15 +5,29 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/qr_data_model.dart';
 import '../models/qr_type.dart';
 
-/// Business service for parsing QR string content and performing smart actions
+/// Service xử lý business logic liên quan đến mã QR.
+///
+/// Chịu trách nhiệm:
+/// - Phát hiện loại QR từ chuỗi thô (pattern matching)
+/// - Parse chuỗi QR thành QRDataModel
+/// - Xây dựng chuỗi theo chuẩn (vCard, event, Google Maps URL)
+/// - Thực hiện hành động: mở URL, gọi điện, copy, share
+///
+/// Class này không chứa UI code — chỉ xử lý dữ liệu và gọi platform APIs.
+/// Private constructor ngăn khởi tạo instance — tất cả method đều static.
 class QRService {
   QRService._();
 
-  /// Auto detect QR payload type based on pattern matching
+  /// Tự động phát hiện loại QR dựa trên pattern matching của chuỗi thô.
+  ///
+  /// Thứ tự check quan trọng — check các pattern đặc biệt trước
+  /// (WiFi, vCard, event có prefix rõ ràng), rồi đến URL/số điện thoại,
+  /// cuối cùng fallback về text thường.
   static QRType detectType(String rawValue) {
     final clean = rawValue.trim();
     final lower = clean.toLowerCase();
 
+    // Ảnh: bắt đầu bằng "IMG:" hoặc "file://" hoặc kết thúc bằng đuôi ảnh
     if (clean.startsWith('IMG:') || clean.startsWith('file://') || lower.endsWith('.jpg') || lower.endsWith('.png') || lower.endsWith('.jpeg')) {
       return QRType.image;
     } else if (clean.startsWith('WIFI:') || clean.startsWith('wifi:')) {
@@ -22,7 +36,7 @@ class QRService {
       return QRType.vcard;
     } else if (clean.startsWith('BEGIN:VEVENT')) {
       return QRType.event;
-    } else if (lower.contains('maps.google.com') || lower.contains('goo.gl/maps')) {
+    } else if (lower.contains('maps.google.com') || lower.endsWith('.goo.gl/maps')) {
       return QRType.location;
     } else if (lower.startsWith('http://') ||
         lower.startsWith('https://') ||
@@ -33,10 +47,14 @@ class QRService {
       return QRType.number;
     }
 
+    // Fallback: mọi thứ khác đều là text thường
     return QRType.text;
   }
 
-  /// Helper to build Google Maps location search URL
+  /// Tạo URL tìm kiếm Google Maps từ chuỗi địa chỉ.
+  ///
+  /// Dùng `Uri.encodeComponent` để mã hóa ký tự đặc biệt (dấu cách, dấu phẩy...)
+  /// thành dạng URL-safe trước khi ghép vào query parameter.
   static String buildGoogleMapsUrl(String input) {
     final clean = input.trim();
     if (clean.isEmpty) return '';
@@ -44,7 +62,11 @@ class QRService {
     return 'https://www.google.com/maps/search/?api=1&query=$encoded';
   }
 
-  /// Helper to build vCard 3.0 string
+  /// Xây dựng chuỗi vCard 3.0 từ các thông tin liên hệ.
+  ///
+  /// vCard là chuẩn quốc tế để trao đổi thông tin danh bạ.
+  /// Mỗi field chỉ được thêm vào chuỗi nếu không rỗng —
+  /// tránh tạo QR chứa thông tin thừa.
   static String buildVCardString({
     required String name,
     required String phone,
@@ -64,7 +86,10 @@ class QRService {
     return buffer.toString();
   }
 
-  /// Helper to build iCalendar VEVENT string for Invitations / Events
+  /// Xây dựng chuỗi iCalendar VEVENT cho thiệp mời / sự kiện.
+  ///
+  /// VEVENT là chuẩn iCalendar dùng để tạo sự kiện trong lịch.
+  /// dtstart dùng định dạng số (VD: 20261225T200000) hoặc text tự do.
   static String buildEventString({
     required String title,
     required String location,
@@ -81,12 +106,17 @@ class QRService {
     return buffer.toString();
   }
 
-  /// Parse raw QR value into QRDataModel entity
+  /// Parse chuỗi QR thô thành QRDataModel hoàn chỉnh.
+  ///
+  /// Flow: detect type → sinh ID từ timestamp → tạo title hiển thị theo type →
+  /// trả về model để lưu vào storage hoặc hiển thị trên UI.
+  /// `isGenerated` phân biệt mã tạo trong app (true) vs mã quét từ camera (false).
   static QRDataModel parseRawData(String rawValue, {bool isGenerated = false}) {
     final type = detectType(rawValue);
     final String id = DateTime.now().millisecondsSinceEpoch.toString();
     String title = rawValue;
 
+    // Tạo title hiển thị phù hợp với từng loại QR
     switch (type) {
       case QRType.website:
         title = rawValue.startsWith('http') ? rawValue : 'https://$rawValue';
@@ -110,6 +140,7 @@ class QRService {
         title = 'QR Ảnh';
         break;
       case QRType.text:
+        // Rút gọn text dài để hiển thị vừa vặn trong list item
         title = rawValue.length > 30 ? '${rawValue.substring(0, 30)}...' : rawValue;
         break;
     }
@@ -124,7 +155,10 @@ class QRService {
     );
   }
 
-  /// Open URL in external browser
+  /// Mở URL trong trình duyệt bên ngoài (browser app của thiết bị).
+  ///
+  /// Đảm bảo URL luôn có prefix "http://" hoặc "https://"
+  /// vì `canLaunchUrl` sẽ trả false nếu URL thiếu scheme.
   static Future<bool> launchURL(String rawUrl) async {
     final String formattedUrl =
         rawUrl.startsWith('http') ? rawUrl : 'https://$rawUrl';
@@ -135,7 +169,9 @@ class QRService {
     return false;
   }
 
-  /// Launch native Phone Dialer app with number pre-filled
+  /// Mở ứng dụng điện thoại với số điện thoại đã điền sẵn.
+  ///
+  /// Xóa prefix "tel:" nếu có vì `Uri.parse('tel:...')` cần số thuần.
   static Future<bool> launchPhoneDialer(String rawNumber) async {
     final String cleanNumber = rawNumber.replaceFirst('tel:', '').trim();
     final Uri uri = Uri.parse('tel:$cleanNumber');
@@ -145,12 +181,12 @@ class QRService {
     return false;
   }
 
-  /// Copy text content to system Clipboard
+  /// Sao chép text vào clipboard hệ thống.
   static Future<void> copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
   }
 
-  /// Share QR raw content via platform native Share sheet
+  /// Chia sẻ nội dung QR qua native share sheet.
   static Future<void> shareContent(String text, {String? subject}) async {
     await Share.share(text, subject: subject ?? 'Mã QR từ FlutQR');
   }

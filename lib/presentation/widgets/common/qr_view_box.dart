@@ -3,13 +3,22 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/constants/app_colors.dart';
 
-/// Customized QR Display Card Box with rounded borders & RepaintBoundary export support
+/// Widget hiển thị mã QR trong card container bo tròn.
+///
+/// Hỗ trợ 2 trạng thái:
+/// - **Empty**: hiển thị placeholder icon + text "Chưa có dữ liệu"
+/// - **Rendered**: hiển thị QR code image với viền + shadow
+///
+/// `repaintKey` truyền vào để wrap trong `RepaintBoundary` —
+/// cho phép capture widget thành PNG khi share/lưu ảnh QR.
 class QrViewBox extends StatelessWidget {
+  /// Dữ liệu QR — nếu rỗng thì hiển thị empty state.
   final String qrData;
   final double size;
   final Color foregroundColor;
   final Color backgroundColor;
   final Widget? logoWidget;
+  /// GlobalKey cho RepaintBoundary — parent truyền vào để export PNG.
   final GlobalKey? repaintKey;
 
   const QrViewBox({
@@ -24,6 +33,7 @@ class QrViewBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Empty state: chưa có dữ liệu QR
     if (qrData.isEmpty) {
       return Container(
         width: size,
@@ -49,6 +59,7 @@ class QrViewBox extends StatelessWidget {
       );
     }
 
+    // QR rendered: hiển thị mã QR trong card
     final Widget qrCard = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -65,7 +76,7 @@ class QrViewBox extends StatelessWidget {
       ),
       child: QrImageView(
         data: qrData,
-        version: QrVersions.auto,
+        version: QrVersions.auto, // Tự động chọn version phù hợp với độ dài data
         size: size,
         eyeStyle: QrEyeStyle(
           eyeShape: QrEyeShape.square,
@@ -81,6 +92,7 @@ class QrViewBox extends StatelessWidget {
       ),
     );
 
+    // Nếu có repaintKey thì wrap trong RepaintBoundary để export PNG
     if (repaintKey != null) {
       return RepaintBoundary(
         key: repaintKey,

@@ -3,7 +3,15 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../../core/constants/app_colors.dart';
 
-/// Floating bottom pill bar widget with flash toggle and gallery picker buttons
+/// Thanh điều khiển nổi phía dưới screen quét — hình pill (bo tròn hoàn toàn).
+///
+/// Chứa 2 nút:
+/// - **Toggle đèn flash**: icon thay đổi theo trạng thái torch (bật/tắt)
+/// - **Chọn ảnh từ gallery**: mở picker để quét QR码 từ ảnh đã lưu
+///
+/// Dùng `ValueListenableBuilder` để reactive với `MobileScannerController` —
+/// mỗi khi torch state thay đổi (người dùng bật/tắt flash),
+/// icon sẽ tự động cập nhật mà không cần rebuild cả widget tree.
 class ScanControlBar extends StatelessWidget {
   final MobileScannerController controller;
   final VoidCallback onPickImage;
@@ -31,6 +39,7 @@ class ScanControlBar extends StatelessWidget {
             ),
           ],
         ),
+        // Lắng nghe MobileScannerState — mỗi lần state thay đổi thì rebuild nội dung
         child: ValueListenableBuilder<MobileScannerState>(
           valueListenable: controller,
           builder: (context, state, child) {
@@ -38,7 +47,7 @@ class ScanControlBar extends StatelessWidget {
             return Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Flash Toggle Button
+                // Nút toggle flash — icon thay đổi theo trạng thái
                 IconButton(
                   iconSize: 26,
                   icon: Icon(
@@ -46,13 +55,13 @@ class ScanControlBar extends StatelessWidget {
                         ? Icons.flash_on_rounded
                         : Icons.flash_on_outlined,
                     color: isTorchOn
-                        ? AppColors.primary
-                        : AppColors.textPrimary,
+                        ? AppColors.primary // Bật: màu primary
+                        : AppColors.textPrimary, // Tắt: màu đen
                   ),
                   onPressed: () => controller.toggleTorch(),
                 ),
 
-                // Vertical Divider
+                // Đường kẻ phân cách
                 Container(
                   height: 24,
                   width: 1,
@@ -60,7 +69,7 @@ class ScanControlBar extends StatelessWidget {
                   color: AppColors.border,
                 ),
 
-                // Gallery Picker Button
+                // Nút chọn ảnh từ gallery
                 IconButton(
                   iconSize: 26,
                   icon: const Icon(

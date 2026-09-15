@@ -2,10 +2,19 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
-/// Application theme configurations (Material 3)
+/// Cấu hình theme tập trung cho toàn bộ ứng dụng (Material 3).
+///
+/// Thay vì style từng widget riêng lẻ, ta định nghĩa theme chung tại đây.
+/// Tất cả AppBar, Card, TextField, Button, BottomNavigationBar...
+/// sẽ tự động kế thừa style từ theme → đảm bảo visual consistency.
+/// Private constructor ngăn khởi tạo instance.
 class AppTheme {
   AppTheme._();
 
+  /// Theme mặc định cho ứng dụng.
+  ///
+  /// `ColorScheme.fromSeed` tự động tạo color scheme hài hòa từ seed color,
+  /// đảm bảo các màu secondary, surface, error... đều match với primary.
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -20,8 +29,8 @@ class AppTheme {
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        scrolledUnderElevation: 1,
+        elevation: 0, // AppBar phẳng, không có shadow
+        scrolledUnderElevation: 1, // Shadow nhẹ khi cuộn
         centerTitle: true,
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
@@ -29,6 +38,7 @@ class AppTheme {
           fontWeight: FontWeight.w600,
         ),
       ),
+      // Card mặc định: viền nhẹ, bo tròn 16px, không shadow
       cardTheme: CardThemeData(
         color: AppColors.cardBackground,
         elevation: 0,
@@ -37,6 +47,7 @@ class AppTheme {
           side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
+      // TextField mặc định: nền trắng, viền bo tròn, viền xanh khi focus
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
@@ -58,6 +69,7 @@ class AppTheme {
           fontSize: 14,
         ),
       ),
+      // Nút bấm chính: nền primary, chữ trắng, bo tròn 12px
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -73,6 +85,7 @@ class AppTheme {
           ),
         ),
       ),
+      // BottomNavigationBar: fixed type, 3 item không co giãn
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
         selectedItemColor: AppColors.primary,

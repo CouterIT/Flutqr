@@ -7,11 +7,19 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-/// Helper utility for capturing, sharing, and saving QR code PNG image files
+/// Helper chuyển widget QR đang render thành file PNG — chia sẻ hoặc lưu thiết bị.
+///
+/// Flow chung: render widget → capture PNG bytes → xử lý (share/lưu).
+/// Dùng `RepaintBoundary` key để truy cập widget đã render trong tree.
+/// Private constructor ngăn khởi tạo instance.
 class QrExporter {
   QrExporter._();
 
-  /// Captures rendered RepaintBoundary widget as PNG byte array
+  /// Capture widget QR đang render thành mảng PNG bytes.
+  ///
+  /// `RepaintBoundary` cho phép "bắt" bitmap của widget con mà không affect
+  /// widget cha. `pixelRatio: 3.0` capture ở độ phân giải cao 3x
+  /// để QR code sắc nét khi chia sẻ hoặc in.
   static Future<Uint8List?> capturePng(GlobalKey key) async {
     try {
       final RenderRepaintBoundary? boundary =
@@ -23,12 +31,15 @@ class QrExporter {
           await image.toByteData(format: ui.ImageByteFormat.png);
       return byteData?.buffer.asUint8List();
     } catch (e) {
-      debugPrint('Error capturing QR PNG: $e');
+      debugPrint('Lỗi khi capture QR PNG: $e');
       return null;
     }
   }
 
-  /// Shares the actual rendered QR image file (.png) via native Share sheet
+  /// Chia sẻ file PNG của mã QR qua native share sheet.
+  ///
+  /// Flow: capture PNG → lưu tạm vào temp directory → gọi Share.shareXFiles.
+  /// File tạm sẽ bị hệ thống dọn dẹp tự động sau khi share xong.
   static Future<void> shareQrImage(GlobalKey key, {String? text}) async {
     final Uint8List? pngBytes = await capturePng(key);
     if (pngBytes == null) return;
@@ -45,11 +56,15 @@ class QrExporter {
         text: text ?? 'Mã QR từ FlutQR',
       );
     } catch (e) {
-      debugPrint('Error sharing QR image: $e');
+      debugPrint('Lỗi khi chia sẻ QR: $e');
     }
   }
 
-  /// Saves the rendered QR image (.png) directly to device photo gallery
+  /// Lưu file PNG của mã QR vào thư viện ảnh thiết bị.
+  ///
+  /// Thử lưu bằng `gal` package trước (để ảnh xuất hiện trong Gallery).
+  /// Nếu `gal` thất bại (thiếu quyền, lỗi platform), fallback về
+  /// lưu file PNG vào temp directory — vẫn đảm bảo dữ liệu không bị mất.
   static Future<bool> saveQrImageToDevice(GlobalKey key,
       {String? customName}) async {
     final Uint8List? pngBytes = await capturePng(key);
@@ -61,7 +76,8 @@ class QrExporter {
       await Gal.putImageBytes(pngBytes, name: cleanName);
       return true;
     } catch (e) {
-      debugPrint('Error saving QR image via Gal: $e');
+      debugPrint('Lỗi lưu QR bằng Gal: $e');
+      // Fallback: lưu file PNG vào temp directory
       try {
         final tempDir = await getTemporaryDirectory();
         final String fileName = 'QR_${DateTime.now().millisecondsSinceEpoch}.png';
@@ -69,7 +85,7 @@ class QrExporter {
         await file.writeAsBytes(pngBytes);
         return true;
       } catch (err) {
-        debugPrint('Error in fallback save: $err');
+        debugPrint('Lỗi fallback lưu QR: $err');
         return false;
       }
     }

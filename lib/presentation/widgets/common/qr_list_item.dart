@@ -5,7 +5,11 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 
-/// Reusable list item for displaying QR codes in lists (history + created)
+/// Widget item hiển thị 1 mã QR trong danh sách (lịch sử + đã tạo).
+///
+/// Dùng chung cho cả HistoryScreen và GenerateScreen —
+/// hiển thị icon loại QR, tên loại, thời gian, và checkbox khi đang chọn nhiều.
+/// Khi không chọn nhiều thì hiển thị mũi tên bên phải.
 class QrListItem extends StatelessWidget {
   final QRDataModel item;
   final bool isSelected;
@@ -27,6 +31,7 @@ class QrListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      // Nền highlight nhẹ khi item đang được chọn
       color: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

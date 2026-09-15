@@ -11,7 +11,14 @@ import '../../widgets/common/scanner_overlay.dart';
 import '../../widgets/scan/scan_control_bar.dart';
 import 'scan_result_screen.dart';
 
-/// Live Camera Scan Screen featuring floating pill controls & gallery image picker
+/// Screen quét mã QR bằng camera real-time.
+///
+/// Flow chính:
+/// 1. Camera detect QR → dừng camera → parse dữ liệu → lưu lịch sử
+/// 2. Navigate sang ScanResultScreen hiển thị kết quả
+/// 3. Khi quay lại → khởi động camera lại
+///
+/// Hỗ trợ quét từ camera và từ ảnh trong gallery.
 class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
@@ -20,6 +27,7 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
+  /// Controller quản lý camera — config speed, hướng camera, trạng thái đèn flash.
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
     facing: CameraFacing.back,
@@ -27,8 +35,15 @@ class _ScanScreenState extends State<ScanScreen> {
   );
 
   final ImagePicker _imagePicker = ImagePicker();
+
+  /// Cờ debounce — tránh xử lý liên tục khi camera đang detect.
+  /// Nếu không có cờ này, 1 mã QR có thể trigger _processQrCode nhiều lần
+  /// trước khi navigate sang screen kết quả.
   bool _isProcessing = false;
 
+  /// Callback được gọi mỗi khi camera detect được barcode/QR.
+  ///
+  /// Kiểm tra `_isProcessing` trước để debounce — nếu đang xử lý thì bỏ qua.
   void _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
 
@@ -41,18 +56,23 @@ class _ScanScreenState extends State<ScanScreen> {
     _processQrCode(rawValue);
   }
 
+  /// Xử lý mã QR: dừng camera → parse → lưu lịch sử → navigate → khởi động lại.
+  ///
+  /// Dùng `await Navigator.push` để đợi user quay lại từ ScanResultScreen,
+  /// sau đó mới restart camera — tránh conflict giữa push và scanner.
   Future<void> _processQrCode(String rawValue) async {
     setState(() {
       _isProcessing = true;
     });
 
+    // Dừng camera để tránh detect liên tục trong khi đang navigate
     _controller.stop();
 
-    // Parse data & save to scanned history
+    // Parse chuỗi thô → QRDataModel rồi lưu vào lịch sử quét
     final QRDataModel model = QRService.parseRawData(rawValue, isGenerated: false);
     await StorageService.saveScannedItem(model);
 
-
+    // Chỉ navigate nếu widget vẫn đang mounted (tránh lỗi sau dispose)
     if (mounted) {
       await Navigator.of(context).push(
         MaterialPageRoute(
@@ -60,7 +80,7 @@ class _ScanScreenState extends State<ScanScreen> {
         ),
       );
 
-      // Reset controller when returning
+      // Reset trạng thái và khởi động camera lại sau khi user quay về
       setState(() {
         _isProcessing = false;
       });
@@ -68,6 +88,10 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  /// Chọn ảnh từ gallery rồi phân tích QR码 trong ảnh.
+  ///
+  /// Dùng `mobile_scanner`'s `analyzeImage` để decode QR từ file ảnh.
+  /// Nếu ảnh không chứa QR → hiện SnackBar thông báo.
   Future<void> _pickImageFromGallery() async {
     if (_isProcessing) return;
 
@@ -78,6 +102,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
       if (file == null) return;
 
+      // Phân tích ảnh để tìm QR — không cần mở camera
       final BarcodeCapture? capture = await _controller.analyzeImage(file.path);
 
       if (capture != null && capture.barcodes.isNotEmpty) {
@@ -88,6 +113,7 @@ class _ScanScreenState extends State<ScanScreen> {
         }
       }
 
+      // Ảnh không chứa mã QR
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -119,18 +145,18 @@ class _ScanScreenState extends State<ScanScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Camera Preview
+          // Camera preview — chiếm toàn bộ màn hình
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
           ),
 
-          // Custom Viewfinder Overlay
+          // Overlay tối với vùng cutout trong suốt + laser line animation
           const ScannerOverlay(
             scanLineColor: AppColors.primary,
           ),
 
-          // Top Header Instruction
+          // Hướng dẫn quét — hiển thị phía trên cùng
           Positioned(
             top: 50,
             left: 20,
@@ -153,7 +179,7 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
 
-          // Bottom Control Pill Bar
+          // Thanh điều khiển nổi phía dưới — toggle đèn flash + chọn ảnh từ gallery
           Positioned(
             bottom: 40,
             left: 0,

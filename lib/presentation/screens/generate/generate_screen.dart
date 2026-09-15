@@ -12,7 +12,12 @@ import '../../widgets/generate/category_grid_item.dart';
 import '../scan/scan_result_screen.dart';
 import 'generate_form_widget.dart';
 
-/// Created Codes Screen with 8 Creation Categories (including Image QR)
+/// Screen quản lý mã QR đã tạo — hiển thị list + flow tạo mã mới.
+///
+/// Có 3 trạng thái chính:
+/// 1. **Xem list**: hiển thị danh sách mã đã tạo, long-press để chọn/xóa
+/// 2. **Chọn loại**: hiển thị grid 8 loại QR để chọn
+/// 3. **Điền form**: hiển thị form nhập liệu + preview QR live
 class GenerateScreen extends StatefulWidget {
   const GenerateScreen({super.key});
 
@@ -21,19 +26,21 @@ class GenerateScreen extends StatefulWidget {
 }
 
 class _GenerateScreenState extends State<GenerateScreen> {
+  /// GlobalKey cho RepaintBoundary trong preview QR — dùng khi export PNG.
   final GlobalKey _previewQrKey = GlobalKey();
   List<QRDataModel> _createdCodesList = [];
   bool _isLoading = true;
   final SelectionController _sel = SelectionController();
 
-  // Creation State
-  bool _isCreating = false;
-  QRType? _selectedType;
-  String _qrPayload = '';
+  // Trạng thái tạo mã mới
+  bool _isCreating = false; // Đang trong flow tạo mã
+  QRType? _selectedType; // Loại QR đang chọn (null = chưa chọn)
+  String _qrPayload = ''; // Nội dung QR hiện tại để preview
 
   @override
   void initState() {
     super.initState();
+    // Lắng nghe SelectionController — mỗi lần state thay đổi thì rebuild UI
     _sel.addListener(() => setState(() {}));
     _loadCreatedCodes();
   }
@@ -45,6 +52,10 @@ class _GenerateScreenState extends State<GenerateScreen> {
     super.dispose();
   }
 
+  /// Tải danh sách mã đã tạo từ SharedPreferences.
+  ///
+  /// Sau khi load, gọi `_sel.cleanUp` để dọn dẹp các ID đã chọn
+  /// không còn tồn tại (trường hợp xóa từ nơi khác).
   Future<void> _loadCreatedCodes() async {
     setState(() => _isLoading = true);
     final list = await StorageService.getCreatedCodes();
@@ -57,6 +68,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     }
   }
 
+  /// Xóa các mã đã chọn — hiện dialog xác nhận trước khi xóa.
   Future<void> _deleteSelected() async {
     if (_sel.selectedIds.isEmpty) return;
     final count = _sel.selectedIds.length;
@@ -89,6 +101,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     }
   }
 
+  /// Bắt đầu flow tạo mã mới — chuyển sang trạng thái chọn loại.
   void _openCreationFlow() {
     setState(() {
       _isCreating = true;
@@ -97,6 +110,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     });
   }
 
+  /// Hủy flow tạo mã — quay về trạng thái xem list.
   void _cancelCreationFlow() {
     setState(() {
       _isCreating = false;
@@ -105,6 +119,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     });
   }
 
+  /// Hoàn tất tạo mã — parse payload → lưu vào storage → reload list → navigate sang result screen.
   Future<void> _saveAndFinish() async {
     if (_qrPayload.isEmpty) return;
     final model = QRService.parseRawData(_qrPayload, isGenerated: true);
@@ -126,6 +141,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        // Leading button thay đổi theo trạng thái: back (tạo), close (chọn), hoặc ẩn
         leading: _isCreating
             ? IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -142,11 +158,13 @@ class _GenerateScreenState extends State<GenerateScreen> {
         ),
         centerTitle: true,
         actions: [
+          // Nút "+" để bắt đầu tạo mã mới
           if (!_isCreating && !_sel.isSelectionMode)
             IconButton(
               icon: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
               onPressed: _openCreationFlow,
             ),
+          // Nút toolbar khi đang chọn nhiều: chọn/bỏ chọn tất cả + xóa
           if (!_isCreating && _sel.isSelectionMode) ...[
             IconButton(
               icon: Icon(isAllSel ? Icons.select_all_rounded : Icons.deselect_rounded, color: Colors.white),
@@ -166,6 +184,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
+  /// Hiển thị danh sách mã QR đã tạo.
   Widget _buildCreatedCodesList() {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_createdCodesList.isEmpty) {
@@ -186,6 +205,8 @@ class _GenerateScreenState extends State<GenerateScreen> {
           isSelectionMode: _sel.isSelectionMode,
           onSelectionChanged: (_) => _sel.toggle(item.id, listLength: _createdCodesList.length),
           onLongPress: () {
+            // Long-press lần đầu: vào selection mode + chọn item này
+            // Long-press lần sau: toggle selection
             if (!_sel.isSelectionMode) {
               _sel.enter(item.id);
             } else {
@@ -204,6 +225,10 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
+  /// Hiển thị grid 8 loại QR để người dùng chọn khi tạo mới.
+  ///
+  /// Dùng `QRType.values.map()` để tạo grid tự động từ enum —
+  /// khi thêm loại QR mới, chỉ cần thêm vào enum là grid tự cập nhật.
   Widget _buildCategoryGrid() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -236,6 +261,10 @@ class _GenerateScreenState extends State<GenerateScreen> {
     );
   }
 
+  /// Hiển thị form nhập liệu + nút "Tạo mã QR".
+  ///
+  /// Form nằm trong GenerateFormWidget — tách riêng để code gọn hơn.
+  /// Nút "Tạo mã" ở bên ngoài form để quản lý state `_qrPayload` tại parent.
   Widget _buildForm() {
     return Column(
       children: [
@@ -255,6 +284,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
               text: 'Tạo mã QR',
               icon: Icons.check_circle_outline_rounded,
               color: _selectedType!.color,
+              // Chỉ enabled khi có nội dung QR (payload không rỗng)
               onPressed: _qrPayload.isNotEmpty ? _saveAndFinish : null,
             ),
           ),

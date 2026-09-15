@@ -8,7 +8,13 @@ import '../../../core/utils/selection_controller.dart';
 import '../../widgets/common/qr_list_item.dart';
 import '../scan/scan_result_screen.dart';
 
-/// History Screen displaying scanned items with Long-Press Selection & Batch Delete
+/// Screen hiển thị lịch sử mã QR đã quét.
+///
+/// Hỗ trợ:
+/// - Hiển thị danh sách từ mới nhất đến cũ nhất
+/// - Long-press để vào chế độ chọn nhiều (multi-select)
+/// - Chọn/bỏ chọn tất cả + xóa hàng loạt
+/// - Nhấn vào item để xem chi tiết kết quả
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -24,6 +30,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+    // Lắng nghe SelectionController — mỗi lần state selection thay đổi thì rebuild UI
     _sel.addListener(() => setState(() {}));
     _loadHistory();
   }
@@ -35,6 +42,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.dispose();
   }
 
+  /// Tải lịch sử quét từ SharedPreferences.
+  ///
+  /// Sau khi load, gọi `_sel.cleanUp` để xóa các ID đã chọn
+  /// không còn tồn tại trong list mới.
   Future<void> _loadHistory() async {
     setState(() => _isLoading = true);
     final list = await StorageService.getScannedHistory();
@@ -47,6 +58,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  /// Xóa các mục đã chọn — hiện dialog xác nhận trước khi xóa vĩnh viễn.
   Future<void> _deleteSelected() async {
     if (_sel.selectedIds.isEmpty) return;
     final count = _sel.selectedIds.length;
@@ -89,6 +101,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        // Nút close hiển thị khi đang trong chế độ chọn nhiều
         leading: _sel.isSelectionMode
             ? IconButton(
                 icon: const Icon(Icons.close_rounded, color: Colors.white),
@@ -101,6 +114,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         centerTitle: true,
         actions: [
+          // Toolbar selection: chọn/bỏ chọn tất cả + xóa
           if (_sel.isSelectionMode) ...[
             IconButton(
               icon: Icon(isAllSel ? Icons.select_all_rounded : Icons.deselect_rounded, color: Colors.white),
@@ -117,6 +131,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _historyList.isEmpty
+              // Empty state khi chưa có lịch sử
               ? const Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -139,6 +154,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       isSelectionMode: _sel.isSelectionMode,
                       onSelectionChanged: (_) => _sel.toggle(item.id, listLength: _historyList.length),
                       onLongPress: () {
+                        // Long-press lần đầu: vào selection mode
+                        // Long-press lần sau: toggle selection
                         if (!_sel.isSelectionMode) {
                           _sel.enter(item.id);
                         } else {

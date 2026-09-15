@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../models/qr_type.dart';
 
-/// Card item widget representing a QR creation type in the category grid
+/// Card item trong grid chọn loại QR khi tạo mã mới.
+///
+/// Hiển thị icon loại QR + tên loại. Nhấn để chọn loại này
+/// và chuyển sang form nhập liệu tương ứng.
 class CategoryGridItem extends StatelessWidget {
   final QRType type;
   final IconData icon;
@@ -34,7 +37,7 @@ class CategoryGridItem extends StatelessWidget {
             Icon(
               icon,
               size: 32,
-              color: type.color,
+              color: type.color, // Màu icon theo loại QR
             ),
             const SizedBox(height: 8),
             Text(

@@ -4,7 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
 import '../../../models/qr_data_model.dart';
 import '../../../services/storage_service.dart';
-import '../../../utils/selection_controller.dart';
+import '../../../core/utils/selection_controller.dart';
 import '../../widgets/common/qr_list_item.dart';
 import '../scan/scan_result_screen.dart';
 

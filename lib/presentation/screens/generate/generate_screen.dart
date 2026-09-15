@@ -5,7 +5,7 @@ import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 import '../../../services/storage_service.dart';
-import '../../../utils/selection_controller.dart';
+import '../../../core/utils/selection_controller.dart';
 import '../../widgets/common/custom_button.dart';
 import '../../widgets/common/qr_list_item.dart';
 import '../../widgets/generate/category_grid_item.dart';

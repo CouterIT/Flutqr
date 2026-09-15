@@ -152,7 +152,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
                 : null),
         title: Text(
           _isCreating
-              ? (_selectedType != null ? _selectedType!.displayName : 'Create')
+              ? (_selectedType != null ? _selectedType!.displayName : 'Tạo mới')
               : (_sel.isSelectionMode ? 'Đã chọn ${_sel.count}' : 'Mã đã tạo'),
           style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
         ),

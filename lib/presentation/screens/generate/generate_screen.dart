@@ -137,7 +137,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
         title: Text(
           _isCreating
               ? (_selectedType != null ? _selectedType!.displayName : 'Create')
-              : (_sel.isSelectionMode ? 'Đã chọn ${_sel.count}' : 'Created codes'),
+              : (_sel.isSelectionMode ? 'Đã chọn ${_sel.count}' : 'Mã đã tạo'),
           style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,
@@ -170,7 +170,7 @@ class _GenerateScreenState extends State<GenerateScreen> {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_createdCodesList.isEmpty) {
       return const Center(
-        child: Text("You haven't created any\ncodes yet.", textAlign: TextAlign.center,
+        child: Text('Bạn chưa tạo mã QR nào', textAlign: TextAlign.center,
             style: TextStyle(fontSize: 24, color: Color(0xFF999999), fontWeight: FontWeight.w400, height: 1.3)),
       );
     }

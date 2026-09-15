@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_strings.dart';
 import '../../../models/qr_data_model.dart';
 import '../../../services/storage_service.dart';
 import '../../../utils/selection_controller.dart';
@@ -95,7 +96,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               )
             : null,
         title: Text(
-          _sel.isSelectionMode ? 'Đã chọn ${_sel.count}' : 'History',
+          _sel.isSelectionMode ? 'Đã chọn ${_sel.count}' : AppStrings.historyTitle,
           style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
         ),
         centerTitle: true,

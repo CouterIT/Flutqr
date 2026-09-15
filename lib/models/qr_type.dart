@@ -20,11 +20,11 @@ extension QRTypeExtension on QRType {
       case QRType.text:
         return 'Văn bản';
       case QRType.number:
-        return 'Number';
+        return 'Số điện thoại';
       case QRType.website:
         return 'Website';
       case QRType.location:
-        return 'Location';
+        return 'Vị trí';
       case QRType.wifi:
         return 'Wi-Fi';
       case QRType.vcard:

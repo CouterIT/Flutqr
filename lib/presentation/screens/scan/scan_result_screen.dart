@@ -1,14 +1,17 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_colors.dart';
+import '../../../core/utils/qr_exporter.dart';
 import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
+import '../../widgets/scan/scan_action_buttons.dart';
 
-/// Scan Result Screen supporting all 8 QR payload types
-class ScanResultScreen extends StatelessWidget {
+/// Scan Result Screen with 2 side-by-side action buttons under QR code
+class ScanResultScreen extends StatefulWidget {
   final QRDataModel qrData;
 
   const ScanResultScreen({
@@ -16,8 +19,16 @@ class ScanResultScreen extends StatelessWidget {
     required this.qrData,
   });
 
+  @override
+  State<ScanResultScreen> createState() => _ScanResultScreenState();
+}
+
+class _ScanResultScreenState extends State<ScanResultScreen> {
+  final GlobalKey _qrBoundaryKey = GlobalKey();
+  bool _isSaving = false;
+
   String get _typeTitle {
-    switch (qrData.type) {
+    switch (widget.qrData.type) {
       case QRType.website:
         return 'Website';
       case QRType.text:
@@ -38,7 +49,7 @@ class ScanResultScreen extends StatelessWidget {
   }
 
   IconData get _typeIcon {
-    switch (qrData.type) {
+    switch (widget.qrData.type) {
       case QRType.website:
         return Icons.web_rounded;
       case QRType.text:
@@ -58,36 +69,58 @@ class ScanResultScreen extends StatelessWidget {
     }
   }
 
-  String get _actionLabelText {
-    switch (qrData.type) {
+  String get _secondaryActionLabel {
+    switch (widget.qrData.type) {
       case QRType.website:
-        return 'Open URL\nin google';
+        return 'Mở Web';
       case QRType.number:
-        return 'Gọi số điện thoại\n(Phone Dialer)';
+        return 'Gọi điện';
       case QRType.location:
-        return 'Mở vị trí\ntrên Google Maps';
+        return 'Mở Maps';
       case QRType.image:
-        return 'Chia sẻ mã QR Ảnh';
+        return 'Chia sẻ ảnh';
       case QRType.text:
-        return 'Sao chép văn bản';
       case QRType.wifi:
-        return 'Sao chép thông tin Wi-Fi';
       case QRType.vcard:
-        return 'Sao chép danh bạ';
       case QRType.event:
-        return 'Sao chép thông tin sự kiện';
+        return 'Sao chép';
     }
   }
 
-  void _performMainAction(BuildContext context) {
-    if (qrData.type == QRType.website || qrData.type == QRType.location) {
-      QRService.launchURL(qrData.rawValue);
-    } else if (qrData.type == QRType.number) {
-      QRService.launchPhoneDialer(qrData.rawValue);
-    } else if (qrData.type == QRType.image) {
-      QRService.shareContent(qrData.rawValue, subject: 'Chia sẻ QR Ảnh');
+  IconData get _secondaryActionIcon {
+    switch (widget.qrData.type) {
+      case QRType.website:
+        return Icons.open_in_browser_rounded;
+      case QRType.number:
+        return Icons.call_rounded;
+      case QRType.location:
+        return Icons.map_rounded;
+      case QRType.image:
+        return Icons.share_rounded;
+      case QRType.text:
+      case QRType.wifi:
+      case QRType.vcard:
+      case QRType.event:
+        return Icons.copy_rounded;
+    }
+  }
+
+  void _performMainAction() {
+    if (widget.qrData.type == QRType.website ||
+        widget.qrData.type == QRType.location) {
+      QRService.launchURL(widget.qrData.rawValue);
+    } else if (widget.qrData.type == QRType.number) {
+      QRService.launchPhoneDialer(widget.qrData.rawValue);
+    } else if (widget.qrData.type == QRType.image) {
+      final String filePath = widget.qrData.rawValue.replaceFirst('IMG:', '');
+      final File imageFile = File(filePath);
+      if (imageFile.existsSync()) {
+        Share.shareXFiles([XFile(imageFile.path)], text: 'Ảnh từ FlutQR');
+      } else {
+        QrExporter.shareQrImage(_qrBoundaryKey, text: 'Mã QR Ảnh từ FlutQR');
+      }
     } else {
-      QRService.copyToClipboard(qrData.rawValue);
+      QRService.copyToClipboard(widget.qrData.rawValue);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đã sao chép nội dung!'),
@@ -97,13 +130,53 @@ class ScanResultScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _shareQrImageFile() async {
+    await QrExporter.shareQrImage(
+      _qrBoundaryKey,
+      text: 'Mã QR ($_typeTitle): ${widget.qrData.title}',
+    );
+  }
+
+  Future<void> _saveQrImageToDevice() async {
+    setState(() {
+      _isSaving = true;
+    });
+
+    final bool isSuccess = await QrExporter.saveQrImageToDevice(
+      _qrBoundaryKey,
+      customName: _typeTitle,
+    );
+
+    setState(() {
+      _isSaving = false;
+    });
+
+    if (mounted) {
+      if (isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Đã lưu hình ảnh mã QR vào thư viện ảnh thành công!'),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Chia sẻ',
+              textColor: Colors.white,
+              onPressed: _shareQrImageFile,
+            ),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể lưu mã QR vào máy, vui lòng kiểm tra quyền thư viện ảnh!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final String imageFilePath = qrData.rawValue.replaceFirst('IMG:', '');
-    final bool isLocalFileImage = qrData.type == QRType.image &&
-        imageFilePath.isNotEmpty &&
-        File(imageFilePath).existsSync();
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -126,9 +199,8 @@ class ScanResultScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.share_rounded, color: Colors.white),
-            onPressed: () {
-              QRService.shareContent(qrData.rawValue);
-            },
+            tooltip: 'Chia sẻ hình ảnh mã QR',
+            onPressed: _shareQrImageFile,
           ),
         ],
       ),
@@ -173,79 +245,55 @@ class ScanResultScreen extends StatelessWidget {
                   children: [
                     const SizedBox(height: 36),
 
-                    // Centered Rendered QR Code
+                    // Centered Rendered QR Code wrapped in RepaintBoundary
                     Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: QrImageView(
-                          data: qrData.rawValue,
-                          version: QrVersions.auto,
-                          size: 220,
-                          eyeStyle: const QrEyeStyle(
-                            eyeShape: QrEyeShape.square,
-                            color: Colors.black,
+                      child: RepaintBoundary(
+                        key: _qrBoundaryKey,
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: const Color(0xFFEEEEEE), width: 1.5),
                           ),
-                          dataModuleStyle: const QrDataModuleStyle(
-                            dataModuleShape: QrDataModuleShape.square,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 36),
-
-                    // Image Preview Thumbnail if local file image
-                    if (isLocalFileImage) ...[
-                      Center(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.file(
-                            File(imageFilePath),
-                            height: 180,
-                            width: double.infinity,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-
-                    // Main Action Text (e.g. "Open URL in google")
-                    Center(
-                      child: InkWell(
-                        onTap: () => _performMainAction(context),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          child: Text(
-                            _actionLabelText,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
-                              height: 1.25,
+                          child: QrImageView(
+                            data: widget.qrData.rawValue,
+                            version: QrVersions.auto,
+                            size: 210,
+                            eyeStyle: const QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: Colors.black,
+                            ),
+                            dataModuleStyle: const QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: Colors.black,
                             ),
                           ),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 24),
+
+                    // 2 Action Buttons Side-by-Side
+                    ScanActionButtons(
+                      isSaving: _isSaving,
+                      secondaryActionLabel: _secondaryActionLabel,
+                      secondaryActionIcon: _secondaryActionIcon,
+                      onSavePressed: _saveQrImageToDevice,
+                      onActionPressed: _performMainAction,
+                    ),
+
+                    const SizedBox(height: 32),
 
                     // Payload details display at bottom
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          qrData.type == QRType.website ||
-                                  qrData.type == QRType.location
+                          widget.qrData.type == QRType.website ||
+                                  widget.qrData.type == QRType.location
                               ? 'URL :'
                               : 'Nội dung :',
                           style: const TextStyle(
@@ -256,9 +304,9 @@ class ScanResultScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         GestureDetector(
-                          onTap: () => _performMainAction(context),
+                          onTap: _performMainAction,
                           child: Text(
-                            qrData.rawValue,
+                            widget.qrData.rawValue,
                             style: const TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w400,

@@ -1,15 +1,17 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
+
 import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 import '../../../services/storage_service.dart';
-import '../../widgets/custom_button.dart';
-import '../../widgets/qr_view_box.dart';
+import '../../widgets/common/custom_button.dart';
+import '../../widgets/common/qr_view_box.dart';
+import '../../widgets/generate/category_grid_item.dart';
+import '../../widgets/generate/created_qr_list_item.dart';
 import '../scan/scan_result_screen.dart';
 
 /// Created Codes Screen with 8 Creation Categories (including Image QR)
@@ -21,6 +23,7 @@ class GenerateScreen extends StatefulWidget {
 }
 
 class _GenerateScreenState extends State<GenerateScreen> {
+  final GlobalKey _previewQrKey = GlobalKey();
   List<QRDataModel> _createdCodesList = [];
   bool _isLoading = true;
 
@@ -335,10 +338,6 @@ class _GenerateScreenState extends State<GenerateScreen> {
     }
   }
 
-  String _formatTimestamp(DateTime dt) {
-    return DateFormat('dd-MM-yyyy hh:mm a').format(dt);
-  }
-
   @override
   void dispose() {
     _textController.dispose();
@@ -467,72 +466,35 @@ class _GenerateScreenState extends State<GenerateScreen> {
         final item = _createdCodesList[index];
         final bool isSelected = _selectedIds.contains(item.id);
 
-        return Container(
-          color: isSelected
-              ? AppColors.primary.withValues(alpha: 0.08)
-              : Colors.transparent,
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              child: Icon(
-                item.type.icon,
-                color: const Color(0xFF6BB5C5),
-                size: 28,
-              ),
-            ),
-            title: Text(
-              item.type.displayName,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 16,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            subtitle: Text(
-              _formatTimestamp(item.timestamp),
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textMuted,
-              ),
-            ),
-            trailing: _isSelectionMode
-                ? Checkbox(
-                    value: isSelected,
-                    activeColor: AppColors.primary,
-                    onChanged: (_) => _toggleSelection(item.id),
-                  )
-                : const Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 16,
-                    color: Color(0xFFD0D0D0),
-                  ),
-            onLongPress: () {
-              if (!_isSelectionMode) {
-                _enterSelectionMode(item.id);
-              } else {
-                _toggleSelection(item.id);
-              }
-            },
-            onTap: () {
-              if (_isSelectionMode) {
-                _toggleSelection(item.id);
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ScanResultScreen(qrData: item),
-                  ),
-                );
-              }
-            },
-          ),
+        return CreatedQrListItem(
+          item: item,
+          isSelected: isSelected,
+          isSelectionMode: _isSelectionMode,
+          onSelectionChanged: (_) => _toggleSelection(item.id),
+          onLongPress: () {
+            if (!_isSelectionMode) {
+              _enterSelectionMode(item.id);
+            } else {
+              _toggleSelection(item.id);
+            }
+          },
+          onTap: () {
+            if (_isSelectionMode) {
+              _toggleSelection(item.id);
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ScanResultScreen(qrData: item),
+                ),
+              );
+            }
+          },
         );
       },
     );
   }
 
-  /// 8-Category Grid Selection View (Including Image QR)
+  /// 8-Category Grid Selection View
   Widget _buildCategoryGrid() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20.0),
@@ -558,52 +520,57 @@ class _GenerateScreenState extends State<GenerateScreen> {
             crossAxisSpacing: 12,
             childAspectRatio: 1.0,
             children: [
-              _buildCategoryCard(QRType.text, Icons.notes_rounded, 'Text'),
-              _buildCategoryCard(QRType.number, Icons.phone_rounded, 'Number'),
-              _buildCategoryCard(QRType.website, Icons.web_rounded, 'Website'),
-              _buildCategoryCard(
-                  QRType.location, Icons.location_on_rounded, 'Location'),
-              _buildCategoryCard(QRType.wifi, Icons.wifi_rounded, 'Wi-Fi'),
-              _buildCategoryCard(QRType.vcard, Icons.badge_rounded, 'vCard'),
-              _buildCategoryCard(
-                  QRType.event, Icons.insert_invitation_rounded, 'Thiệp mời'),
-              _buildCategoryCard(QRType.image, Icons.image_rounded, 'QR Ảnh'),
+              CategoryGridItem(
+                type: QRType.text,
+                icon: Icons.notes_rounded,
+                label: 'Text',
+                onTap: () => _selectCategory(QRType.text),
+              ),
+              CategoryGridItem(
+                type: QRType.number,
+                icon: Icons.phone_rounded,
+                label: 'Number',
+                onTap: () => _selectCategory(QRType.number),
+              ),
+              CategoryGridItem(
+                type: QRType.website,
+                icon: Icons.web_rounded,
+                label: 'Website',
+                onTap: () => _selectCategory(QRType.website),
+              ),
+              CategoryGridItem(
+                type: QRType.location,
+                icon: Icons.location_on_rounded,
+                label: 'Location',
+                onTap: () => _selectCategory(QRType.location),
+              ),
+              CategoryGridItem(
+                type: QRType.wifi,
+                icon: Icons.wifi_rounded,
+                label: 'Wi-Fi',
+                onTap: () => _selectCategory(QRType.wifi),
+              ),
+              CategoryGridItem(
+                type: QRType.vcard,
+                icon: Icons.badge_rounded,
+                label: 'vCard',
+                onTap: () => _selectCategory(QRType.vcard),
+              ),
+              CategoryGridItem(
+                type: QRType.event,
+                icon: Icons.insert_invitation_rounded,
+                label: 'Thiệp mời',
+                onTap: () => _selectCategory(QRType.event),
+              ),
+              CategoryGridItem(
+                type: QRType.image,
+                icon: Icons.image_rounded,
+                label: 'QR Ảnh',
+                onTap: () => _selectCategory(QRType.image),
+              ),
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryCard(QRType type, IconData icon, String label) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFEEEEEE), width: 1),
-      ),
-      child: InkWell(
-        onTap: () => _selectCategory(type),
-        borderRadius: BorderRadius.circular(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 32,
-              color: type.color,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -615,12 +582,13 @@ class _GenerateScreenState extends State<GenerateScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Live Preview Box
+          // Live Preview Box with repaintKey for export
           Center(
             child: QrViewBox(
               qrData: _qrPayload,
               size: 190,
               foregroundColor: _selectedType!.color,
+              repaintKey: _previewQrKey,
             ),
           ),
 

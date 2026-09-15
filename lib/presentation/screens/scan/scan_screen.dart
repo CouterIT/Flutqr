@@ -7,7 +7,8 @@ import '../../../core/constants/app_strings.dart';
 import '../../../models/qr_data_model.dart';
 import '../../../services/qr_service.dart';
 import '../../../services/storage_service.dart';
-import '../../widgets/scanner_overlay.dart';
+import '../../widgets/common/scanner_overlay.dart';
+import '../../widgets/scan/scan_control_bar.dart';
 import 'scan_result_screen.dart';
 
 /// Live Camera Scan Screen featuring floating pill controls & gallery image picker
@@ -152,69 +153,14 @@ class _ScanScreenState extends State<ScanScreen> {
             ),
           ),
 
-          // Bottom Control Pill Bar (Matching Screenshot 1)
+          // Bottom Control Pill Bar
           Positioned(
             bottom: 40,
             left: 0,
             right: 0,
-            child: Center(
-              child: Container(
-                height: 56,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ValueListenableBuilder<MobileScannerState>(
-                  valueListenable: _controller,
-                  builder: (context, state, child) {
-                    final bool isTorchOn = state.torchState == TorchState.on;
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Flash Toggle Button
-                        IconButton(
-                          iconSize: 26,
-                          icon: Icon(
-                            isTorchOn
-                                ? Icons.flash_on_rounded
-                                : Icons.flash_on_outlined,
-                            color: isTorchOn
-                                ? AppColors.primary
-                                : AppColors.textPrimary,
-                          ),
-                          onPressed: () => _controller.toggleTorch(),
-                        ),
-
-                        // Vertical Divider
-                        Container(
-                          height: 24,
-                          width: 1,
-                          margin: const EdgeInsets.symmetric(horizontal: 8),
-                          color: AppColors.border,
-                        ),
-
-                        // Gallery Picker Button
-                        IconButton(
-                          iconSize: 26,
-                          icon: const Icon(
-                            Icons.collections_outlined,
-                            color: AppColors.textPrimary,
-                          ),
-                          onPressed: _pickImageFromGallery,
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
+            child: ScanControlBar(
+              controller: _controller,
+              onPickImage: _pickImageFromGallery,
             ),
           ),
         ],

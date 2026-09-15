@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_colors.dart';
+import '../../../core/constants/app_colors.dart';
 
 /// Camera Scanner overlay with square cutout, corner accents & animated laser line
 class ScannerOverlay extends StatefulWidget {
@@ -81,7 +81,6 @@ class _ScannerOverlayState extends State<ScannerOverlay>
                           blurRadius: 8,
                           spreadRadius: 2,
                         ),
-
                       ],
                     ),
                   ),

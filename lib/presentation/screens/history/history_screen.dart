@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../models/qr_data_model.dart';
-import '../../../models/qr_type.dart';
 import '../../../services/storage_service.dart';
 import '../scan/scan_result_screen.dart';
+import '../../widgets/history/history_list_item.dart';
 
 /// History Screen displaying scanned items with Long-Press Selection & Batch Delete
 class HistoryScreen extends StatefulWidget {
@@ -98,7 +97,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         title: Text(isAll ? 'Xóa tất cả lịch sử' : 'Xóa mục đã chọn'),
         content: Text(
           isAll
-              ? 'Bạn có chắc chắn muốn xóa toàn bộ $_historyList.length lịch sử đã quét?'
+              ? 'Bạn có chắc chắn muốn xóa toàn bộ ${_historyList.length} lịch sử đã quét?'
               : 'Bạn có chắc chắn muốn xóa $count mục đã chọn?',
         ),
         actions: [
@@ -122,10 +121,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _exitSelectionMode();
       _loadHistory();
     }
-  }
-
-  String _formatTimestamp(DateTime dt) {
-    return DateFormat('dd-MM-yyyy hh:mm a').format(dt);
   }
 
   @override
@@ -206,67 +201,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     final item = _historyList[index];
                     final bool isSelected = _selectedIds.contains(item.id);
 
-                    return Container(
-                      color: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.08)
-                          : Colors.transparent,
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        leading: Container(
-                          padding: const EdgeInsets.all(8),
-                          child: Icon(
-                            item.type.icon,
-                            color: const Color(0xFF6BB5C5),
-                            size: 28,
-                          ),
-                        ),
-                        title: Text(
-                          item.type.displayName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w500,
-                            fontSize: 16,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        subtitle: Text(
-                          _formatTimestamp(item.timestamp),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                        trailing: _isSelectionMode
-                            ? Checkbox(
-                                value: isSelected,
-                                activeColor: AppColors.primary,
-                                onChanged: (_) => _toggleSelection(item.id),
-                              )
-                            : const Icon(
-                                Icons.arrow_forward_ios_rounded,
-                                size: 16,
-                                color: Color(0xFFD0D0D0),
-                              ),
-                        onLongPress: () {
-                          if (!_isSelectionMode) {
-                            _enterSelectionMode(item.id);
-                          } else {
-                            _toggleSelection(item.id);
-                          }
-                        },
-                        onTap: () {
-                          if (_isSelectionMode) {
-                            _toggleSelection(item.id);
-                          } else {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ScanResultScreen(qrData: item),
-                              ),
-                            );
-                          }
-                        },
-                      ),
+                    return HistoryListItem(
+                      item: item,
+                      isSelected: isSelected,
+                      isSelectionMode: _isSelectionMode,
+                      onSelectionChanged: (_) => _toggleSelection(item.id),
+                      onLongPress: () {
+                        if (!_isSelectionMode) {
+                          _enterSelectionMode(item.id);
+                        } else {
+                          _toggleSelection(item.id);
+                        }
+                      },
+                      onTap: () {
+                        if (_isSelectionMode) {
+                          _toggleSelection(item.id);
+                        } else {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ScanResultScreen(qrData: item),
+                            ),
+                          );
+                        }
+                      },
                     );
                   },
                 ),

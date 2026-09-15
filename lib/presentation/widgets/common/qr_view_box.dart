@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../core/constants/app_colors.dart';
+import '../../../core/constants/app_colors.dart';
 
-/// Customized QR Display Card Box with rounded borders & background styling
+/// Customized QR Display Card Box with rounded borders & RepaintBoundary export support
 class QrViewBox extends StatelessWidget {
   final String qrData;
   final double size;
   final Color foregroundColor;
   final Color backgroundColor;
   final Widget? logoWidget;
+  final GlobalKey? repaintKey;
 
   const QrViewBox({
     super.key,
@@ -18,6 +19,7 @@ class QrViewBox extends StatelessWidget {
     this.foregroundColor = AppColors.textPrimary,
     this.backgroundColor = Colors.white,
     this.logoWidget,
+    this.repaintKey,
   });
 
   @override
@@ -47,7 +49,7 @@ class QrViewBox extends StatelessWidget {
       );
     }
 
-    return Container(
+    final Widget qrCard = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -59,7 +61,6 @@ class QrViewBox extends StatelessWidget {
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
-
         ],
       ),
       child: QrImageView(
@@ -79,5 +80,14 @@ class QrViewBox extends StatelessWidget {
             : null,
       ),
     );
+
+    if (repaintKey != null) {
+      return RepaintBoundary(
+        key: repaintKey,
+        child: qrCard,
+      );
+    }
+
+    return qrCard;
   }
 }

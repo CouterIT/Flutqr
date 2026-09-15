@@ -104,6 +104,11 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
   /// - event: chuẩn iCalendar VEVENT
   /// - image: `IMG:/path/to/image`
   void _updatePayload() {
+    if (widget.type == QRType.image) {
+      widget.onPayloadChanged(_selectedImagePath != null ? 'IMG:$_selectedImagePath' : '');
+      return;
+    }
+
     final c = _controllers[widget.type]!;
     String payload = '';
 
@@ -144,7 +149,7 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
           );
         }
       case QRType.image:
-        payload = _selectedImagePath != null ? 'IMG:$_selectedImagePath' : '';
+        break;
     }
 
     // Gửi payload về parent để update preview QR realtime
@@ -187,58 +192,173 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
 
   /// Xây dựng form input phù hợp với loại QR đang chọn.
   Widget _buildInput() {
+    if (widget.type == QRType.image) {
+      return Column(children: [
+        // Hiển thị preview ảnh nếu đã chọn
+        if (_selectedImagePath != null) ...[
+          ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(_selectedImagePath!), height: 160, width: double.infinity, fit: BoxFit.cover)),
+          const SizedBox(height: 16),
+        ],
+        CustomButton(
+          text: _selectedImagePath == null ? 'Chọn ảnh từ thư viện' : 'Đổi ảnh khác',
+          icon: Icons.photo_library_rounded,
+          isSecondary: true,
+          onPressed: _pickImage,
+        ),
+      ]);
+    }
+
     final c = _controllers[widget.type]!;
     switch (widget.type) {
       case QRType.text:
-        return TextField(controller: c[0], maxLines: 4, decoration: const InputDecoration(hintText: 'Nhập nội dung văn bản...'));
+        return TextField(
+          controller: c[0],
+          maxLines: 4,
+          textAlignVertical: TextAlignVertical.top,
+          decoration: const InputDecoration(
+            hintText: 'Nhập nội dung văn bản...',
+            alignLabelWithHint: true,
+          ),
+        );
       case QRType.number:
-        return TextField(controller: c[0], keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: 'Nhập số điện thoại...', prefixIcon: Icon(Icons.phone_rounded)));
+        return TextField(
+          controller: c[0],
+          keyboardType: TextInputType.phone,
+          textAlignVertical: TextAlignVertical.center,
+          decoration: const InputDecoration(
+            hintText: 'Nhập số điện thoại...',
+            prefixIcon: Icon(Icons.phone_rounded),
+          ),
+        );
       case QRType.website:
-        return TextField(controller: c[0], keyboardType: TextInputType.url, decoration: const InputDecoration(hintText: 'https://example.com', prefixIcon: Icon(Icons.link_rounded)));
+        return TextField(
+          controller: c[0],
+          keyboardType: TextInputType.url,
+          textAlignVertical: TextAlignVertical.center,
+          decoration: const InputDecoration(
+            hintText: 'https://example.com',
+            prefixIcon: Icon(Icons.link_rounded),
+          ),
+        );
       case QRType.location:
-        return TextField(controller: c[0], decoration: const InputDecoration(hintText: 'Nhập địa chỉ hoặc tọa độ...', prefixIcon: Icon(Icons.location_on_rounded)));
+        return TextField(
+          controller: c[0],
+          textAlignVertical: TextAlignVertical.center,
+          decoration: const InputDecoration(
+            hintText: 'Nhập địa chỉ hoặc tọa độ...',
+            prefixIcon: Icon(Icons.location_on_rounded),
+          ),
+        );
       case QRType.wifi:
         return Column(children: [
-          TextField(controller: c[0], decoration: const InputDecoration(hintText: 'Tên mạng Wi-Fi (SSID)...', prefixIcon: Icon(Icons.wifi_rounded))),
+          TextField(
+            controller: c[0],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Tên mạng Wi-Fi (SSID)...',
+              prefixIcon: Icon(Icons.wifi_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[1], obscureText: true, decoration: const InputDecoration(hintText: 'Mật khẩu Wi-Fi...', prefixIcon: Icon(Icons.lock_rounded))),
+          TextField(
+            controller: c[1],
+            obscureText: true,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Mật khẩu Wi-Fi...',
+              prefixIcon: Icon(Icons.lock_rounded),
+            ),
+          ),
         ]);
       case QRType.vcard:
         return Column(children: [
-          TextField(controller: c[0], decoration: const InputDecoration(hintText: 'Họ và tên...', prefixIcon: Icon(Icons.person_rounded))),
+          TextField(
+            controller: c[0],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Họ và tên...',
+              prefixIcon: Icon(Icons.person_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[1], keyboardType: TextInputType.phone, decoration: const InputDecoration(hintText: 'Số điện thoại...', prefixIcon: Icon(Icons.phone_rounded))),
+          TextField(
+            controller: c[1],
+            keyboardType: TextInputType.phone,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Số điện thoại...',
+              prefixIcon: Icon(Icons.phone_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[2], keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(hintText: 'Email...', prefixIcon: Icon(Icons.email_rounded))),
+          TextField(
+            controller: c[2],
+            keyboardType: TextInputType.emailAddress,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Email...',
+              prefixIcon: Icon(Icons.email_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[3], decoration: const InputDecoration(hintText: 'Công ty / Chức danh...', prefixIcon: Icon(Icons.business_rounded))),
+          TextField(
+            controller: c[3],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Công ty / Chức danh...',
+              prefixIcon: Icon(Icons.business_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[4], decoration: const InputDecoration(hintText: 'Địa chỉ...', prefixIcon: Icon(Icons.location_city_rounded))),
+          TextField(
+            controller: c[4],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Địa chỉ...',
+              prefixIcon: Icon(Icons.location_city_rounded),
+            ),
+          ),
         ]);
       case QRType.event:
         return Column(children: [
-          TextField(controller: c[0], decoration: const InputDecoration(hintText: 'Tiêu đề thiệp mời...', prefixIcon: Icon(Icons.insert_invitation_rounded))),
+          TextField(
+            controller: c[0],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Tiêu đề thiệp mời...',
+              prefixIcon: Icon(Icons.insert_invitation_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[1], decoration: const InputDecoration(hintText: 'Địa điểm tổ chức...', prefixIcon: Icon(Icons.place_rounded))),
+          TextField(
+            controller: c[1],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Địa điểm tổ chức...',
+              prefixIcon: Icon(Icons.place_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[2], decoration: const InputDecoration(hintText: 'Ngày & Giờ...', prefixIcon: Icon(Icons.event_rounded))),
+          TextField(
+            controller: c[2],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Ngày & Giờ...',
+              prefixIcon: Icon(Icons.event_rounded),
+            ),
+          ),
           const SizedBox(height: 12),
-          TextField(controller: c[3], maxLines: 3, decoration: const InputDecoration(hintText: 'Ghi chú / Lời mời...', prefixIcon: Icon(Icons.notes_rounded))),
-        ]);
-      case QRType.image:
-        return Column(children: [
-          // Hiển thị preview ảnh nếu đã chọn
-          if (_selectedImagePath != null) ...[
-            ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(_selectedImagePath!), height: 160, width: double.infinity, fit: BoxFit.cover)),
-            const SizedBox(height: 16),
-          ],
-          CustomButton(
-            text: _selectedImagePath == null ? 'Chọn ảnh từ thư viện' : 'Đổi ảnh khác',
-            icon: Icons.photo_library_rounded,
-            isSecondary: true,
-            onPressed: _pickImage,
+          TextField(
+            controller: c[3],
+            textAlignVertical: TextAlignVertical.center,
+            decoration: const InputDecoration(
+              hintText: 'Ghi chú / Lời mời...',
+              prefixIcon: Icon(Icons.notes_rounded),
+            ),
           ),
         ]);
+      case QRType.image:
+        return const SizedBox.shrink();
     }
   }
 }

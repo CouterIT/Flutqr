@@ -21,12 +21,8 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Index của tab đang hiển thị: 0=Quét, 1=Tạo, 2=Lịch sử.
   int _currentIndex = 0;
 
-  /// Danh sách 3 screen — tạo 1 lần, tái sử dụng qua IndexedStack.
-  final List<Widget> _screens = const [
-    ScanScreen(),
-    GenerateScreen(),
-    HistoryScreen(),
-  ];
+  final GlobalKey<GenerateScreenState> _generateKey = GlobalKey<GenerateScreenState>();
+  final GlobalKey<HistoryScreenState> _historyKey = GlobalKey<HistoryScreenState>();
 
   @override
   Widget build(BuildContext context) {
@@ -35,11 +31,24 @@ class _HomeScreenState extends State<HomeScreen> {
       // nhưng giữ nguyên state của tất cả screen trong danh sách.
       body: IndexedStack(
         index: _currentIndex,
-        children: _screens,
+        children: [
+          const ScanScreen(),
+          GenerateScreen(key: _generateKey),
+          HistoryScreen(key: _historyKey),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
+          // Khi chọn tab khác hoặc chọn lại tab hiện tại:
+          // Reset state của tab Tạo mã (nếu rời đi hoặc chọn tab Tạo mã)
+          if (_currentIndex == 1 || index == 1) {
+            _generateKey.currentState?.resetState();
+          }
+          // Reset state của tab Lịch sử khi chọn tab Lịch sử
+          if (index == 2) {
+            _historyKey.currentState?.resetState();
+          }
           setState(() {
             _currentIndex = index;
           });

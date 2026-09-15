@@ -1,17 +1,22 @@
-/// Vietnamese UI Strings and labels
+/// Tập trung tất cả chuỗi UI tiếng Việt của ứng dụng.
+///
+/// Bằng cách đặt tất cả text tại 1 nơi, khi cần sửa nội dung hiển thị
+/// (sửa chính tả, thêm ngôn ngữ, thay đổi thông báo),
+/// ta chỉ cần sửa trong file này mà không cần tìm kiếm khắp codebase.
+/// Private constructor ngăn khởi tạo instance — class chỉ chứa static constants.
 class AppStrings {
   AppStrings._();
 
-  // App Name
+  // Tên ứng dụng
   static const String appName = 'FlutQR';
   static const String appSubtitle = 'Quét & Tạo mã QR nhanh chóng';
 
-  // Navigation Tabs
+  // Thanh điều hướng
   static const String tabScan = 'Quét mã';
   static const String tabGenerate = 'Tạo mã';
   static const String tabHistory = 'Lịch sử';
 
-  // Scan Screen
+  // Screen quét
   static const String scanTitle = 'Quét mã QR';
   static const String scanInstruction = 'Di chuyển ống kính tới vùng chứa mã QR';
   static const String torchOn = 'Đã bật đèn';
@@ -19,7 +24,7 @@ class AppStrings {
   static const String pickFromGallery = 'Thư viện ảnh';
   static const String switchCamera = 'Đổi camera';
 
-  // Scan Result Screen
+  // Screen kết quả quét
   static const String resultTitle = 'Kết quả quét';
   static const String resultType = 'Loại mã';
   static const String rawContent = 'Nội dung';
@@ -30,7 +35,7 @@ class AppStrings {
   static const String btnConnectWifi = 'Kết nối Wi-Fi';
   static const String copiedToClipboard = 'Đã sao chép vào bộ nhớ tạm!';
 
-  // Generate Screen
+  // Screen tạo mã
   static const String generateTitle = 'Tạo mã QR';
   static const String typeText = 'Văn bản';
   static const String typeUrl = 'Đường dẫn (URL)';
@@ -38,7 +43,7 @@ class AppStrings {
   static const String typeEmail = 'Email';
   static const String typePhone = 'Số điện thoại';
 
-  // Generate Placeholders
+  // Placeholder cho input
   static const String hintText = 'Nhập nội dung văn bản...';
   static const String hintUrl = 'https://example.com';
   static const String hintWifiSsid = 'Tên mạng Wi-Fi (SSID)';
@@ -50,7 +55,7 @@ class AppStrings {
   static const String btnDownload = 'Lưu mã';
   static const String qrGeneratedSuccess = 'Đã tạo mã QR thành công!';
 
-  // History Screen
+  // Screen lịch sử
   static const String historyTitle = 'Lịch sử';
   static const String historyTabAll = 'Tất cả';
   static const String historyTabScanned = 'Đã quét';
@@ -63,7 +68,7 @@ class AppStrings {
   static const String confirm = 'Xác nhận';
   static const String itemDeleted = 'Đã xóa khỏi lịch sử';
 
-  // Common Errors & Messages
+  // Thông báo lỗi chung
   static const String errorGeneric = 'Đã xảy ra lỗi, vui lòng thử lại';
   static const String errorCameraPermission = 'Vui lòng cấp quyền truy cập camera';
   static const String errorInvalidUrl = 'Đường dẫn liên kết không hợp lệ';

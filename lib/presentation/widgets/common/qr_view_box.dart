@@ -1,15 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../core/constants/app_colors.dart';
+import '../../../core/constants/app_colors.dart';
 
-/// Customized QR Display Card Box with rounded borders & background styling
+/// Widget hiển thị mã QR trong card container bo tròn.
+///
+/// Hỗ trợ 2 trạng thái:
+/// - **Empty**: hiển thị placeholder icon + text "Chưa có dữ liệu"
+/// - **Rendered**: hiển thị QR code image với viền + shadow
+///
+/// `repaintKey` truyền vào để wrap trong `RepaintBoundary` —
+/// cho phép capture widget thành PNG khi share/lưu ảnh QR.
 class QrViewBox extends StatelessWidget {
+  /// Dữ liệu QR — nếu rỗng thì hiển thị empty state.
   final String qrData;
   final double size;
   final Color foregroundColor;
   final Color backgroundColor;
   final Widget? logoWidget;
+  /// GlobalKey cho RepaintBoundary — parent truyền vào để export PNG.
+  final GlobalKey? repaintKey;
 
   const QrViewBox({
     super.key,
@@ -18,10 +28,12 @@ class QrViewBox extends StatelessWidget {
     this.foregroundColor = AppColors.textPrimary,
     this.backgroundColor = Colors.white,
     this.logoWidget,
+    this.repaintKey,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Empty state: chưa có dữ liệu QR
     if (qrData.isEmpty) {
       return Container(
         width: size,
@@ -47,7 +59,8 @@ class QrViewBox extends StatelessWidget {
       );
     }
 
-    return Container(
+    // QR rendered: hiển thị mã QR trong card
+    final Widget qrCard = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: backgroundColor,
@@ -55,7 +68,7 @@ class QrViewBox extends StatelessWidget {
         border: Border.all(color: AppColors.border, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -63,7 +76,7 @@ class QrViewBox extends StatelessWidget {
       ),
       child: QrImageView(
         data: qrData,
-        version: QrVersions.auto,
+        version: QrVersions.auto, // Tự động chọn version phù hợp với độ dài data
         size: size,
         eyeStyle: QrEyeStyle(
           eyeShape: QrEyeShape.square,
@@ -78,5 +91,15 @@ class QrViewBox extends StatelessWidget {
             : null,
       ),
     );
+
+    // Nếu có repaintKey thì wrap trong RepaintBoundary để export PNG
+    if (repaintKey != null) {
+      return RepaintBoundary(
+        key: repaintKey,
+        child: qrCard,
+      );
+    }
+
+    return qrCard;
   }
 }

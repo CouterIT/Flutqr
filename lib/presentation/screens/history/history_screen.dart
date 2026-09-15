@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/utils/formatters.dart';
 import '../../../models/qr_data_model.dart';
-import '../../../models/qr_type.dart';
 import '../../../services/storage_service.dart';
+import '../../../core/utils/selection_controller.dart';
+import '../../widgets/common/qr_list_item.dart';
 import '../scan/scan_result_screen.dart';
 
-/// History Screen displaying scanned and generated QR items
+/// Screen hiển thị lịch sử mã QR đã quét.
+///
+/// Hỗ trợ:
+/// - Hiển thị danh sách từ mới nhất đến cũ nhất
+/// - Long-press để vào chế độ chọn nhiều (multi-select)
+/// - Chọn/bỏ chọn tất cả + xóa hàng loạt
+/// - Nhấn vào item để xem chi tiết kết quả
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -16,26 +22,35 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _HistoryScreenState extends State<HistoryScreen> {
   List<QRDataModel> _historyList = [];
-  String _searchQuery = '';
   bool _isLoading = true;
+  final SelectionController _sel = SelectionController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    // Lắng nghe SelectionController — mỗi lần state selection thay đổi thì rebuild UI
+    _sel.addListener(() => setState(() {}));
     _loadHistory();
   }
 
+  @override
+  void dispose() {
+    _sel.removeListener(() {});
+    _sel.dispose();
+    super.dispose();
+  }
+
+  /// Tải lịch sử quét từ SharedPreferences.
+  ///
+  /// Sau khi load, gọi `_sel.cleanUp` để xóa các ID đã chọn
+  /// không còn tồn tại trong list mới.
   Future<void> _loadHistory() async {
-    setState(() {
-      _isLoading = true;
-    });
-    final list = await StorageService.getHistory();
+    setState(() => _isLoading = true);
+    final list = await StorageService.getScannedHistory();
     if (mounted) {
+      _sel.cleanUp(list.map((e) => e.id).toList());
       setState(() {
         _historyList = list;
         _isLoading = false;
@@ -43,230 +58,120 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
   }
 
-  Future<void> _deleteItem(String id) async {
-    await StorageService.deleteItem(id);
-    _loadHistory();
-  }
+  /// Xóa các mục đã chọn — hiện dialog xác nhận trước khi xóa vĩnh viễn.
+  Future<void> _deleteSelected() async {
+    if (_sel.selectedIds.isEmpty) return;
+    final count = _sel.selectedIds.length;
+    final isAll = _sel.isAllSelected(_historyList.length);
 
-  Future<void> _clearHistory() async {
-    final bool? confirm = await showDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(AppStrings.clearHistory),
-        content: const Text(AppStrings.confirmClearHistory),
+      builder: (ctx) => AlertDialog(
+        title: Text(isAll ? 'Xóa tất cả lịch sử' : 'Xóa mục đã chọn'),
+        content: Text(isAll
+            ? 'Bạn có chắc chắn muốn xóa toàn bộ ${_historyList.length} lịch sử đã quét?'
+            : 'Bạn có chắc chắn muốn xóa $count mục đã chọn?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text(AppStrings.cancel),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(AppStrings.confirm),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Xóa'),
           ),
         ],
       ),
     );
 
     if (confirm == true) {
-      await StorageService.clearHistory();
+      for (final id in _sel.selectedIds) {
+        await StorageService.deleteScannedItem(id);
+      }
+      _sel.exit();
       _loadHistory();
     }
   }
 
-  List<QRDataModel> _filterList(int tabIndex) {
-    return _historyList.where((item) {
-      // Search filter
-      final matchesSearch = item.title
-              .toLowerCase()
-              .contains(_searchQuery.toLowerCase()) ||
-          item.rawValue.toLowerCase().contains(_searchQuery.toLowerCase());
-
-      if (!matchesSearch) return false;
-
-      // Tab filter
-      if (tabIndex == 1) return !item.isGenerated; // Scanned
-      if (tabIndex == 2) return item.isGenerated; // Generated
-
-      return true; // All
-    }).toList();
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.historyTitle),
-        actions: [
-          if (_historyList.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep_rounded, color: AppColors.error),
-              tooltip: AppStrings.clearHistory,
-              onPressed: _clearHistory,
-            ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textMuted,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: AppStrings.historyTabAll),
-            Tab(text: AppStrings.historyTabScanned),
-            Tab(text: AppStrings.historyTabGenerated),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
-          // Search Input
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: AppStrings.historySearchHint,
-                prefixIcon: Icon(Icons.search_rounded),
-              ),
-              onChanged: (val) {
-                setState(() {
-                  _searchQuery = val;
-                });
-              },
-            ),
-          ),
+    final isAllSel = _sel.isAllSelected(_historyList.length);
 
-          // TabBarView Content
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                    controller: _tabController,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        // Nút close hiển thị khi đang trong chế độ chọn nhiều
+        leading: _sel.isSelectionMode
+            ? IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                onPressed: _sel.exit,
+              )
+            : null,
+        title: Text(
+          _sel.isSelectionMode ? 'Đã chọn ${_sel.count}' : AppStrings.historyTitle,
+          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
+        ),
+        centerTitle: true,
+        actions: [
+          // Toolbar selection: chọn/bỏ chọn tất cả + xóa
+          if (_sel.isSelectionMode) ...[
+            IconButton(
+              icon: Icon(isAllSel ? Icons.select_all_rounded : Icons.deselect_rounded, color: Colors.white),
+              tooltip: isAllSel ? 'Bỏ chọn tất cả' : 'Chọn tất cả',
+              onPressed: () => _sel.toggleAll(_historyList.map((e) => e.id).toList()),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_rounded, color: Colors.white),
+              onPressed: _deleteSelected,
+            ),
+          ],
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _historyList.isEmpty
+              // Empty state khi chưa có lịch sử
+              ? const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildHistoryList(_filterList(0)),
-                      _buildHistoryList(_filterList(1)),
-                      _buildHistoryList(_filterList(2)),
+                      Icon(Icons.history_rounded, size: 64, color: AppColors.textMuted),
+                      SizedBox(height: 12),
+                      Text('Chưa có lịch sử quét nào', style: TextStyle(color: AppColors.textMuted, fontSize: 15)),
                     ],
                   ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryList(List<QRDataModel> list) {
-    if (list.isEmpty) {
-      return const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.history_rounded, size: 64, color: AppColors.textMuted),
-            SizedBox(height: 12),
-            Text(
-              AppStrings.emptyHistory,
-              style: TextStyle(color: AppColors.textMuted, fontSize: 15),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: list.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final item = list[index];
-        return Dismissible(
-          key: Key(item.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            decoration: BoxDecoration(
-              color: AppColors.error,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Icon(Icons.delete_rounded, color: Colors.white),
-          ),
-          onDismissed: (_) => _deleteItem(item.id),
-          child: Card(
-            child: ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: item.type.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  itemCount: _historyList.length,
+                  separatorBuilder: (_, _) => const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                  itemBuilder: (context, index) {
+                    final item = _historyList[index];
+                    return QrListItem(
+                      item: item,
+                      isSelected: _sel.isSelected(item.id),
+                      isSelectionMode: _sel.isSelectionMode,
+                      onSelectionChanged: (_) => _sel.toggle(item.id, listLength: _historyList.length),
+                      onLongPress: () {
+                        // Long-press lần đầu: vào selection mode
+                        // Long-press lần sau: toggle selection
+                        if (!_sel.isSelectionMode) {
+                          _sel.enter(item.id);
+                        } else {
+                          _sel.toggle(item.id, listLength: _historyList.length);
+                        }
+                      },
+                      onTap: () {
+                        if (_sel.isSelectionMode) {
+                          _sel.toggle(item.id, listLength: _historyList.length);
+                        } else {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: item)));
+                        }
+                      },
+                    );
+                  },
                 ),
-                child: Icon(item.type.icon, color: item.type.color, size: 24),
-              ),
-              title: Text(
-                item.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 4.0),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: item.isGenerated
-                            ? AppColors.secondary.withValues(alpha: 0.12)
-                            : AppColors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        item.isGenerated ? 'Đã tạo' : 'Đã quét',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: item.isGenerated
-                              ? AppColors.secondary
-                              : AppColors.primary,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(width: 8),
-                    Text(
-                      Formatters.formatRelativeTime(item.timestamp),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              trailing: const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textMuted,
-              ),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ScanResultScreen(qrData: item),
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
     );
   }
 }

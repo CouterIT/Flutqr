@@ -213,6 +213,25 @@ class ScanScreenState extends State<ScanScreen> {
               onPickImage: _pickImageFromGallery,
             ),
           ),
+
+          // Loading overlay khi đang xử lý QR — hiện spinner giữa màn hình
+          if (_isProcessing)
+            Container(
+              color: Colors.black.withValues(alpha: 0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                    SizedBox(height: 16),
+                    Text(
+                      'Đang xử lý mã QR...',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

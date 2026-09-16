@@ -68,7 +68,7 @@ class HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  /// Xóa các mục đã chọn — hiện dialog xác nhận trước khi xóa vĩnh viễn.
+  /// Xóa các mục đã chọn — hiện dialog xác nhận + SnackBar undo.
   Future<void> _deleteSelected() async {
     if (_sel.selectedIds.isEmpty) return;
     final count = _sel.selectedIds.length;
@@ -93,9 +93,34 @@ class HistoryScreenState extends State<HistoryScreen> {
     );
 
     if (confirm == true) {
+      // Lưu lại items trước khi xóa để có thể hoàn tác
+      final deletedItems = _historyList
+          .where((item) => _sel.selectedIds.contains(item.id))
+          .toList();
+
       await StorageService.deleteScannedItems(_sel.selectedIds.toList());
       _sel.exit();
       _loadHistory();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã xóa $count mục'),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Hoàn tác',
+              textColor: Colors.white,
+              onPressed: () async {
+                // Khôi phục các items đã xóa
+                for (final item in deletedItems) {
+                  await StorageService.saveScannedItem(item);
+                }
+                _loadHistory();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -150,35 +175,36 @@ class HistoryScreenState extends State<HistoryScreen> {
                     ],
                   ),
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  itemCount: _historyList.length,
-                  separatorBuilder: (_, _) => const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
-                  itemBuilder: (context, index) {
-                    final item = _historyList[index];
-                    return QrListItem(
-                      item: item,
-                      isSelected: _sel.isSelected(item.id),
-                      isSelectionMode: _sel.isSelectionMode,
-                      onSelectionChanged: (_) => _sel.toggle(item.id, listLength: _historyList.length),
-                      onLongPress: () {
-                        // Long-press lần đầu: vào selection mode
-                        // Long-press lần sau: toggle selection
-                        if (!_sel.isSelectionMode) {
-                          _sel.enter(item.id);
-                        } else {
-                          _sel.toggle(item.id, listLength: _historyList.length);
-                        }
-                      },
-                      onTap: () {
-                        if (_sel.isSelectionMode) {
-                          _sel.toggle(item.id, listLength: _historyList.length);
-                        } else {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: item)));
-                        }
-                      },
-                    );
-                  },
+              : RefreshIndicator(
+                  onRefresh: _loadHistory,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    itemCount: _historyList.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+                    itemBuilder: (context, index) {
+                      final item = _historyList[index];
+                      return QrListItem(
+                        item: item,
+                        isSelected: _sel.isSelected(item.id),
+                        isSelectionMode: _sel.isSelectionMode,
+                        onSelectionChanged: (_) => _sel.toggle(item.id, listLength: _historyList.length),
+                        onLongPress: () {
+                          if (!_sel.isSelectionMode) {
+                            _sel.enter(item.id);
+                          } else {
+                            _sel.toggle(item.id, listLength: _historyList.length);
+                          }
+                        },
+                        onTap: () {
+                          if (_sel.isSelectionMode) {
+                            _sel.toggle(item.id, listLength: _historyList.length);
+                          } else {
+                            Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: item)));
+                          }
+                        },
+                      );
+                    },
+                  ),
                 ),
     );
   }

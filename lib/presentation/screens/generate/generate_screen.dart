@@ -36,9 +36,10 @@ class GenerateScreenState extends State<GenerateScreen> {
   late final VoidCallback _onSelChanged = () => setState(() {});
 
   // Trạng thái tạo mã mới
-  bool _isCreating = false; // Đang trong flow tạo mã
-  QRType? _selectedType; // Loại QR đang chọn (null = chưa chọn)
-  String _qrPayload = ''; // Nội dung QR hiện tại để preview
+  bool _isCreating = false;
+  bool _isSaving = false;
+  QRType? _selectedType;
+  String _qrPayload = '';
 
   /// Reset toàn bộ state của screen về vị trí ban đầu (danh sách mã đã tạo).
   void resetState() {
@@ -83,7 +84,7 @@ class GenerateScreenState extends State<GenerateScreen> {
     }
   }
 
-  /// Xóa các mã đã chọn — hiện dialog xác nhận trước khi xóa.
+  /// Xóa các mã đã chọn — hiện dialog xác nhận + SnackBar undo.
   Future<void> _deleteSelected() async {
     if (_sel.selectedIds.isEmpty) return;
     final count = _sel.selectedIds.length;
@@ -108,9 +109,32 @@ class GenerateScreenState extends State<GenerateScreen> {
     );
 
     if (confirm == true) {
+      final deletedItems = _createdCodesList
+          .where((item) => _sel.selectedIds.contains(item.id))
+          .toList();
+
       await StorageService.deleteCreatedItems(_sel.selectedIds.toList());
       _sel.exit();
       _loadCreatedCodes();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã xóa $count mã'),
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'Hoàn tác',
+              textColor: Colors.white,
+              onPressed: () async {
+                for (final item in deletedItems) {
+                  await StorageService.saveCreatedItem(item);
+                }
+                _loadCreatedCodes();
+              },
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -134,13 +158,27 @@ class GenerateScreenState extends State<GenerateScreen> {
 
   /// Hoàn tất tạo mã — parse payload → lưu vào storage → reload list → navigate sang result screen.
   Future<void> _saveAndFinish() async {
-    if (_qrPayload.isEmpty) return;
-    final model = QRService.parseRawData(_qrPayload, isGenerated: true);
-    await StorageService.saveCreatedItem(model);
-    _cancelCreationFlow();
-    _loadCreatedCodes();
-    if (mounted) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: model)));
+    if (_qrPayload.isEmpty || _isSaving) return;
+
+    setState(() => _isSaving = true);
+
+    try {
+      final model = QRService.parseRawData(_qrPayload, isGenerated: true);
+      await StorageService.saveCreatedItem(model);
+      _cancelCreationFlow();
+      _loadCreatedCodes();
+      if (mounted) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: model)));
+      }
+    } catch (e) {
+      debugPrint('Lỗi tạo mã QR: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tạo mã QR: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -201,40 +239,57 @@ class GenerateScreenState extends State<GenerateScreen> {
   Widget _buildCreatedCodesList() {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
     if (_createdCodesList.isEmpty) {
-      return const Center(
-        child: Text('Bạn chưa tạo mã QR nào', textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 24, color: Color(0xFF999999), fontWeight: FontWeight.w400, height: 1.3)),
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.qr_code_rounded, size: 64, color: AppColors.textMuted),
+            const SizedBox(height: 12),
+            const Text(
+              'Bạn chưa tạo mã QR nào',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: AppColors.textMuted, fontWeight: FontWeight.w400),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Nhấn + để tạo mã mới',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+          ],
+        ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      itemCount: _createdCodesList.length,
-      separatorBuilder: (_, _) => const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
-      itemBuilder: (context, index) {
-        final item = _createdCodesList[index];
-        return QrListItem(
-          item: item,
-          isSelected: _sel.isSelected(item.id),
-          isSelectionMode: _sel.isSelectionMode,
-          onSelectionChanged: (_) => _sel.toggle(item.id, listLength: _createdCodesList.length),
-          onLongPress: () {
-            // Long-press lần đầu: vào selection mode + chọn item này
-            // Long-press lần sau: toggle selection
-            if (!_sel.isSelectionMode) {
-              _sel.enter(item.id);
-            } else {
-              _sel.toggle(item.id, listLength: _createdCodesList.length);
-            }
-          },
-          onTap: () {
-            if (_sel.isSelectionMode) {
-              _sel.toggle(item.id, listLength: _createdCodesList.length);
-            } else {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: item)));
-            }
-          },
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: _loadCreatedCodes,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        itemCount: _createdCodesList.length,
+        separatorBuilder: (_, _) => const Divider(height: 1, thickness: 1, color: Color(0xFFF0F0F0)),
+        itemBuilder: (context, index) {
+          final item = _createdCodesList[index];
+          return QrListItem(
+            item: item,
+            isSelected: _sel.isSelected(item.id),
+            isSelectionMode: _sel.isSelectionMode,
+            onSelectionChanged: (_) => _sel.toggle(item.id, listLength: _createdCodesList.length),
+            onLongPress: () {
+              if (!_sel.isSelectionMode) {
+                _sel.enter(item.id);
+              } else {
+                _sel.toggle(item.id, listLength: _createdCodesList.length);
+              }
+            },
+            onTap: () {
+              if (_sel.isSelectionMode) {
+                _sel.toggle(item.id, listLength: _createdCodesList.length);
+              } else {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: item)));
+              }
+            },
+          );
+        },
+      ),
     );
   }
 
@@ -294,11 +349,11 @@ class GenerateScreenState extends State<GenerateScreen> {
           child: SizedBox(
             width: double.infinity,
             child: CustomButton(
-              text: 'Tạo mã QR',
-              icon: Icons.check_circle_outline_rounded,
+              text: _isSaving ? 'Đang lưu...' : 'Tạo mã QR',
+              icon: _isSaving ? null : Icons.check_circle_outline_rounded,
               color: _selectedType!.color,
-              // Chỉ enabled khi có nội dung QR (payload không rỗng)
-              onPressed: _qrPayload.isNotEmpty ? _saveAndFinish : null,
+              isLoading: _isSaving,
+              onPressed: (_qrPayload.isNotEmpty && !_isSaving) ? _saveAndFinish : null,
             ),
           ),
         ),

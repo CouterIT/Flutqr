@@ -30,7 +30,7 @@ class CloudImageService {
 
   /// API Key Imgbb (Bạn có thể lấy miễn phí tại https://api.imgbb.com)
   /// Điền API Key của bạn vào đây nếu có key riêng.
-  static String imgbbApiKey = '30113c2dbdcd403ca603953daeb287e0';
+  static String imgbbApiKey = '3569b38e357045ceed58dfadfd649b2e';
 
   static const String _uploadEndpoint = 'https://api.imgbb.com/1/upload';
 

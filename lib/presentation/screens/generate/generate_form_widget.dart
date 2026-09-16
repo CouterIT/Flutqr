@@ -6,7 +6,6 @@ import '../../../services/cloud_image_service.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 import '../../widgets/common/custom_button.dart';
-import '../../widgets/common/qr_view_box.dart';
 
 /// Form nhập liệu + preview QR live khi tạo mã QR mới.
 ///
@@ -189,17 +188,7 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Preview QR — hiển thị realtime khi nhập liệu
-          Center(
-            child: QrViewBox(
-              qrData: '',
-              size: 190,
-              foregroundColor: widget.type.color,
-              repaintKey: widget.repaintKey,
-            ),
-          ),
-          const SizedBox(height: 24),
-          // Form input thay đổi theo loại QR
+          // Form input thay đổi theo loại QR đang chọn
           _buildInput(),
           const SizedBox(height: 24),
         ],
@@ -271,9 +260,11 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
                     children: [
                       Icon(Icons.cloud_done_rounded, color: Color(0xFF16A34A), size: 20),
                       SizedBox(width: 8),
-                      Text(
-                        'Đã tải lên Imgbb Cloud thành công!',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                      Expanded(
+                        child: Text(
+                          'Đã tải lên Imgbb Cloud thành công!',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                        ),
                       ),
                     ],
                   ),

@@ -32,6 +32,9 @@ class GenerateScreenState extends State<GenerateScreen> {
   bool _isLoading = true;
   final SelectionController _sel = SelectionController();
 
+  /// Lưu callback reference để removeListener đúng (tránh memory leak).
+  late final VoidCallback _onSelChanged = () => setState(() {});
+
   // Trạng thái tạo mã mới
   bool _isCreating = false; // Đang trong flow tạo mã
   QRType? _selectedType; // Loại QR đang chọn (null = chưa chọn)
@@ -53,14 +56,13 @@ class GenerateScreenState extends State<GenerateScreen> {
   @override
   void initState() {
     super.initState();
-    // Lắng nghe SelectionController — mỗi lần state thay đổi thì rebuild UI
-    _sel.addListener(() => setState(() {}));
+    _sel.addListener(_onSelChanged);
     _loadCreatedCodes();
   }
 
   @override
   void dispose() {
-    _sel.removeListener(() {});
+    _sel.removeListener(_onSelChanged);
     _sel.dispose();
     super.dispose();
   }
@@ -106,9 +108,7 @@ class GenerateScreenState extends State<GenerateScreen> {
     );
 
     if (confirm == true) {
-      for (final id in _sel.selectedIds) {
-        await StorageService.deleteCreatedItem(id);
-      }
+      await StorageService.deleteCreatedItems(_sel.selectedIds.toList());
       _sel.exit();
       _loadCreatedCodes();
     }

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/constants/api_keys.dart';
+
 /// Model kết quả tải ảnh lên Imgbb Cloud.
 class CloudImageResponse {
   final bool success;
@@ -28,9 +30,8 @@ class CloudImageResponse {
 class CloudImageService {
   CloudImageService._();
 
-  /// API Key Imgbb (Bạn có thể lấy miễn phí tại https://api.imgbb.com)
-  /// Điền API Key của bạn vào đây nếu có key riêng.
-  static String imgbbApiKey = '3569b38e357045ceed58dfadfd649b2e';
+  /// API Key Imgbb từ --dart-define hoặc storage.
+  static String get imgbbApiKey => ApiKeys.imgbbApiKey;
 
   static const String _uploadEndpoint = 'https://api.imgbb.com/1/upload';
 

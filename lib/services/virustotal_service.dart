@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../core/constants/api_keys.dart';
+
 /// Model lưu trữ kết quả phân tích độ an toàn của URL từ VirusTotal.
 class VirusTotalReport {
   final int malicious;
@@ -43,8 +45,8 @@ class VirusTotalService {
 
   static const String _baseUrl = 'https://www.virustotal.com/api/v3';
 
-  /// API Key mặc định
-  static const String defaultApiKey = 'ef5fe0a25e8dcf56d76b0c0ab0d8e8153fda1f05b5d664cec943b733424cc719';
+  /// API Key từ --dart-define hoặc storage
+  static String get defaultApiKey => ApiKeys.virustotalApiKey;
 
   /// Cache kết quả kiểm tra URL trong phiên làm việc
   static final Map<String, VirusTotalReport> _cache = {};

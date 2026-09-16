@@ -27,6 +27,9 @@ class HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
   final SelectionController _sel = SelectionController();
 
+  /// Lưu callback reference để removeListener đúng (tránh memory leak).
+  late final VoidCallback _onSelChanged = () => setState(() {});
+
   /// Reset state lịch sử (thoát chế độ chọn nhiều + làm mới danh sách).
   void resetState() {
     if (mounted) {
@@ -38,14 +41,13 @@ class HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
-    // Lắng nghe SelectionController — mỗi lần state selection thay đổi thì rebuild UI
-    _sel.addListener(() => setState(() {}));
+    _sel.addListener(_onSelChanged);
     _loadHistory();
   }
 
   @override
   void dispose() {
-    _sel.removeListener(() {});
+    _sel.removeListener(_onSelChanged);
     _sel.dispose();
     super.dispose();
   }
@@ -91,9 +93,7 @@ class HistoryScreenState extends State<HistoryScreen> {
     );
 
     if (confirm == true) {
-      for (final id in _sel.selectedIds) {
-        await StorageService.deleteScannedItem(id);
-      }
+      await StorageService.deleteScannedItems(_sel.selectedIds.toList());
       _sel.exit();
       _loadHistory();
     }

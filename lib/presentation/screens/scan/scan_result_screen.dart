@@ -193,7 +193,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
               decoration: const BoxDecoration(color: Colors.white, border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1))),
               child: Row(
                 children: [
-                  Icon(_type.icon, color: const Color(0xFF6BB5C5), size: 24),
+                  Icon(_type.icon, color: AppColors.qrTypeIcon, size: 24),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(_type.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: AppColors.textPrimary)),

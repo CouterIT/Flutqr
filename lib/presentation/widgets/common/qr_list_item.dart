@@ -37,7 +37,7 @@ class QrListItem extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         leading: Padding(
           padding: const EdgeInsets.all(8),
-          child: Icon(item.type.icon, color: const Color(0xFF6BB5C5), size: 28),
+          child: Icon(item.type.icon, color: AppColors.qrTypeIcon, size: 28),
         ),
         title: Text(
           item.type.displayName,

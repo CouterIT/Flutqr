@@ -2,10 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../services/cloud_image_service.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
 import '../../widgets/common/custom_button.dart';
-import '../../widgets/common/qr_view_box.dart';
 
 /// Form nhập liệu + preview QR live khi tạo mã QR mới.
 ///
@@ -17,22 +17,18 @@ import '../../widgets/common/qr_view_box.dart';
 /// - WiFi: 2 ô (SSID + mật khẩu)
 /// - vCard: 5 ô (tên, SĐT, email, công ty, địa chỉ)
 /// - Event: 4 ô (tiêu đề, địa điểm, ngày giờ, ghi chú)
-/// - Image: nút chọn ảnh + preview
+/// - Image: nút chọn ảnh + tải lên Imgbb Cloud + preview link
 ///
 /// Widget này emit payload QR về parent qua callback `onPayloadChanged`
 /// để parent update preview QR và quản lý nút "Tạo mã".
 class GenerateFormWidget extends StatefulWidget {
-  /// Loại QR đang tạo — quyết định form input nào được hiển thị.
   final QRType type;
-
-  /// GlobalKey cho RepaintBoundary — parent truyền vào để export PNG.
   final GlobalKey? repaintKey;
-
-  /// Callback mỗi khi nội dung form thay đổi — payload QR được gửi về parent.
   final ValueChanged<String> onPayloadChanged;
-
-  /// Callback khi người dùng muốn hủy tạo mã.
   final VoidCallback onCancel;
+
+  /// Callback khi user chọn logo — trả về file path.
+  final ValueChanged<String?>? onLogoChanged;
 
   const GenerateFormWidget({
     super.key,
@@ -40,6 +36,7 @@ class GenerateFormWidget extends StatefulWidget {
     this.repaintKey,
     required this.onPayloadChanged,
     required this.onCancel,
+    this.onLogoChanged,
   });
 
   @override
@@ -49,14 +46,13 @@ class GenerateFormWidget extends StatefulWidget {
 class _GenerateFormWidgetState extends State<GenerateFormWidget> {
   final ImagePicker _imagePicker = ImagePicker();
   String? _selectedImagePath;
+  bool _isUploadingImage = false;
+  String? _cloudImageUrl;
+  String? _uploadError;
 
-  /// Map lưu TextEditingController cho mỗi loại QR.
-  ///
-  /// Mỗi loại có số lượng field khác nhau:
-  /// - text/number/website/location: 1 controller
-  /// - wifi: 2 controllers (SSID + password)
-  /// - vcard: 5 controllers (name, phone, email, company, address)
-  /// - event: 4 controllers (title, location, dateTime, note)
+  // Logo state
+  String? _logoPath;
+
   late final Map<QRType, List<TextEditingController>> _controllers;
 
   @override
@@ -93,19 +89,9 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
   }
 
   /// Đọc giá trị từ form → build QR payload theo type → gửi về parent.
-  ///
-  /// Mỗi type có format payload riêng:
-  /// - text: nội dung thường
-  /// - number: `tel:0901234567`
-  /// - website: `https://example.com`
-  /// - location: Google Maps URL
-  /// - wifi: `WIFI:S:SSID;P:password;T:WPA;;`
-  /// - vCard: chuẩn vCard 3.0
-  /// - event: chuẩn iCalendar VEVENT
-  /// - image: `IMG:/path/to/image`
   void _updatePayload() {
     if (widget.type == QRType.image) {
-      widget.onPayloadChanged(_selectedImagePath != null ? 'IMG:$_selectedImagePath' : '');
+      widget.onPayloadChanged(_cloudImageUrl ?? '');
       return;
     }
 
@@ -156,13 +142,49 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
     widget.onPayloadChanged(payload);
   }
 
-  /// Mở gallery để người dùng chọn ảnh cho loại QR "Image".
+  /// Mở gallery để người dùng chọn ảnh cho loại QR "Image" và tự động upload lên Imgbb Cloud.
   Future<void> _pickImage() async {
     final file = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (file != null) {
-      setState(() => _selectedImagePath = file.path);
-      _updatePayload();
+      setState(() {
+        _selectedImagePath = file.path;
+        _isUploadingImage = true;
+        _cloudImageUrl = null;
+        _uploadError = null;
+      });
+      widget.onPayloadChanged(''); // Tạm thời xóa payload khi đang upload
+
+      final response = await CloudImageService.uploadImage(File(file.path));
+
+      if (mounted) {
+        if (response.success && response.url != null) {
+          setState(() {
+            _cloudImageUrl = response.url;
+            _isUploadingImage = false;
+          });
+          widget.onPayloadChanged(response.url!);
+        } else {
+          setState(() {
+            _uploadError = response.errorMessage ?? 'Không thể tải ảnh lên Imgbb Cloud.';
+            _isUploadingImage = false;
+          });
+          widget.onPayloadChanged('');
+        }
+      }
     }
+  }
+
+  Future<void> _pickLogo() async {
+    final file = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (file != null && mounted) {
+      setState(() => _logoPath = file.path);
+      widget.onLogoChanged?.call(file.path);
+    }
+  }
+
+  void _removeLogo() {
+    setState(() => _logoPath = null);
+    widget.onLogoChanged?.call(null);
   }
 
   @override
@@ -172,18 +194,79 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Preview QR — hiển thị realtime khi nhập liệu
-          Center(
-            child: QrViewBox(
-              qrData: '',
-              size: 190,
-              foregroundColor: widget.type.color,
-              repaintKey: widget.repaintKey,
+          // Form input thay đổi theo loại QR đang chọn
+          _buildInput(),
+          const SizedBox(height: 16),
+
+          // Logo picker (cho QR có logo)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.purple.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.purple.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.photo_library_outlined, size: 18, color: Colors.purple[400]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Logo (tùy chọn)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.purple[700],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_logoPath != null)
+                      TextButton.icon(
+                        onPressed: _removeLogo,
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text('Xóa'),
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Thêm logo vào giữa mã QR (dùng API QR Gen)',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                if (_logoPath != null) ...[
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(_logoPath!),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _pickLogo,
+                    icon: Icon(_logoPath == null ? Icons.add_photo_alternate_outlined : Icons.change_circle_outlined),
+                    label: Text(_logoPath == null ? 'Chọn logo từ thư viện' : 'Thay đổi logo'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.purple[600],
+                      side: BorderSide(color: Colors.purple.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 24),
-          // Form input thay đổi theo loại QR
-          _buildInput(),
+
           const SizedBox(height: 24),
         ],
       ),
@@ -193,19 +276,123 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
   /// Xây dựng form input phù hợp với loại QR đang chọn.
   Widget _buildInput() {
     if (widget.type == QRType.image) {
-      return Column(children: [
-        // Hiển thị preview ảnh nếu đã chọn
-        if (_selectedImagePath != null) ...[
-          ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(File(_selectedImagePath!), height: 160, width: double.infinity, fit: BoxFit.cover)),
-          const SizedBox(height: 16),
+      return Column(
+        children: [
+          // Hiển thị preview ảnh nếu đã chọn
+          if (_selectedImagePath != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.file(
+                File(_selectedImagePath!),
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
+
+          // Đang upload lên Cloud
+          if (_isUploadingImage) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: const Row(
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Đang tải ảnh lên Imgbb Cloud...',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF1D4ED8)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Upload thành công -> Hiển thị badge xanh
+          if (_cloudImageUrl != null && !_isUploadingImage) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF86EFAC)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.cloud_done_rounded, color: Color(0xFF16A34A), size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Đã tải lên Imgbb Cloud thành công!',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _cloudImageUrl!,
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF15803D), decoration: TextDecoration.underline),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Lỗi upload -> Hiển thị badge đỏ
+          if (_uploadError != null && !_isUploadingImage) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFCA5A5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _uploadError!,
+                      style: const TextStyle(fontSize: 12, color: Color(0xFFB91C1C)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          CustomButton(
+            text: _selectedImagePath == null
+                ? 'Chọn ảnh từ thư viện'
+                : (_isUploadingImage ? 'Đang tải lên...' : 'Đổi ảnh khác'),
+            icon: Icons.photo_library_rounded,
+            isSecondary: true,
+            onPressed: _isUploadingImage ? null : _pickImage,
+          ),
         ],
-        CustomButton(
-          text: _selectedImagePath == null ? 'Chọn ảnh từ thư viện' : 'Đổi ảnh khác',
-          icon: Icons.photo_library_rounded,
-          isSecondary: true,
-          onPressed: _pickImage,
-        ),
-      ]);
+      );
     }
 
     final c = _controllers[widget.type]!;

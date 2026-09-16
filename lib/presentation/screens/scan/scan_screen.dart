@@ -23,10 +23,10 @@ class ScanScreen extends StatefulWidget {
   const ScanScreen({super.key});
 
   @override
-  State<ScanScreen> createState() => _ScanScreenState();
+  State<ScanScreen> createState() => ScanScreenState();
 }
 
-class _ScanScreenState extends State<ScanScreen> {
+class ScanScreenState extends State<ScanScreen> {
   /// Controller quản lý camera — config speed, hướng camera, trạng thái đèn flash.
   final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.normal,
@@ -37,13 +37,12 @@ class _ScanScreenState extends State<ScanScreen> {
   final ImagePicker _imagePicker = ImagePicker();
 
   /// Cờ debounce — tránh xử lý liên tục khi camera đang detect.
-  /// Nếu không có cờ này, 1 mã QR có thể trigger _processQrCode nhiều lần
-  /// trước khi navigate sang screen kết quả.
   bool _isProcessing = false;
 
+  /// Pause camera khi chuyển sang tab khác — tiết kiệm pin và tài nguyên.
+  bool _isPaused = false;
+
   /// Callback được gọi mỗi khi camera detect được barcode/QR.
-  ///
-  /// Kiểm tra `_isProcessing` trước để debounce — nếu đang xử lý thì bỏ qua.
   void _onDetect(BarcodeCapture capture) async {
     if (_isProcessing) return;
 
@@ -56,10 +55,23 @@ class _ScanScreenState extends State<ScanScreen> {
     _processQrCode(rawValue);
   }
 
+  /// Pause camera — gọi từ HomeScreen khi chuyển sang tab khác.
+  void pauseCamera() {
+    if (!_isPaused && !_isProcessing) {
+      _isPaused = true;
+      _controller.stop();
+    }
+  }
+
+  /// Resume camera — gọi từ HomeScreen khi quay lại tab Scan.
+  void resumeCamera() {
+    if (_isPaused && !_isProcessing) {
+      _isPaused = false;
+      _controller.start();
+    }
+  }
+
   /// Xử lý mã QR: dừng camera → parse → lưu lịch sử → navigate → khởi động lại.
-  ///
-  /// Dùng `await Navigator.push` để đợi user quay lại từ ScanResultScreen,
-  /// sau đó mới restart camera — tránh conflict giữa push và scanner.
   Future<void> _processQrCode(String rawValue) async {
     setState(() {
       _isProcessing = true;
@@ -68,23 +80,35 @@ class _ScanScreenState extends State<ScanScreen> {
     // Dừng camera để tránh detect liên tục trong khi đang navigate
     _controller.stop();
 
-    // Parse chuỗi thô → QRDataModel rồi lưu vào lịch sử quét
-    final QRDataModel model = QRService.parseRawData(rawValue, isGenerated: false);
-    await StorageService.saveScannedItem(model);
+    try {
+      final QRDataModel model = QRService.parseRawData(rawValue, isGenerated: false);
+      await StorageService.saveScannedItem(model);
 
-    // Chỉ navigate nếu widget vẫn đang mounted (tránh lỗi sau dispose)
-    if (mounted) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => ScanResultScreen(qrData: model),
-        ),
-      );
-
-      // Reset trạng thái và khởi động camera lại sau khi user quay về
-      setState(() {
-        _isProcessing = false;
-      });
-      _controller.start();
+      if (mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ScanResultScreen(qrData: model),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Lỗi xử lý QR code: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi xử lý mã QR: $e'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      // Luôn khởi động lại camera và reset state, kể cả khi có lỗi
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+        _controller.start();
+      }
     }
   }
 
@@ -189,6 +213,25 @@ class _ScanScreenState extends State<ScanScreen> {
               onPickImage: _pickImageFromGallery,
             ),
           ),
+
+          // Loading overlay khi đang xử lý QR — hiện spinner giữa màn hình
+          if (_isProcessing)
+            Container(
+              color: Colors.black.withValues(alpha: 0.5),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                    SizedBox(height: 16),
+                    Text(
+                      'Đang xử lý mã QR...',
+                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

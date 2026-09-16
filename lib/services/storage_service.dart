@@ -16,6 +16,7 @@ class StorageService {
   // Key lưu trữ trong SharedPreferences — version v2 để backward-compatible
   static const String _keyScannedHistory = 'flutqr_scanned_history_v2';
   static const String _keyCreatedCodes = 'flutqr_created_codes_v2';
+  static const String _keyVirusTotalApiKey = 'flutqr_virustotal_api_key';
 
   static SharedPreferences? _prefs;
 
@@ -60,6 +61,13 @@ class StorageService {
     await _saveList(key, list);
   }
 
+  /// Xóa nhiều items theo list ID — batch delete (1 lần read, 1 lần write).
+  static Future<void> _deleteItems(String key, List<String> ids) async {
+    final list = await _getItems(key);
+    list.removeWhere((e) => ids.contains(e.id));
+    await _saveList(key, list);
+  }
+
   /// Xóa toàn bộ collection theo key.
   static Future<void> _clearItems(String key) async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -80,6 +88,8 @@ class StorageService {
   static Future<void> saveScannedItem(QRDataModel item) => _upsertItem(_keyScannedHistory, item);
   /// Xóa 1 mã quét theo ID.
   static Future<void> deleteScannedItem(String id) => _deleteItem(_keyScannedHistory, id);
+  /// Xóa nhiều mã quét theo list ID (batch).
+  static Future<void> deleteScannedItems(List<String> ids) => _deleteItems(_keyScannedHistory, ids);
   /// Xóa toàn bộ lịch sử quét.
   static Future<void> clearScannedHistory() => _clearItems(_keyScannedHistory);
 
@@ -91,6 +101,22 @@ class StorageService {
   static Future<void> saveCreatedItem(QRDataModel item) => _upsertItem(_keyCreatedCodes, item);
   /// Xóa 1 mã tạo theo ID.
   static Future<void> deleteCreatedItem(String id) => _deleteItem(_keyCreatedCodes, id);
+  /// Xóa nhiều mã tạo theo list ID (batch).
+  static Future<void> deleteCreatedItems(List<String> ids) => _deleteItems(_keyCreatedCodes, ids);
   /// Xóa toàn bộ mã đã tạo.
   static Future<void> clearCreatedCodes() => _clearItems(_keyCreatedCodes);
+
+  // ================= VirusTotal Settings =================
+
+  /// Đọc VirusTotal API Key đã lưu.
+  static Future<String> getVirusTotalApiKey() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs?.getString(_keyVirusTotalApiKey) ?? '';
+  }
+
+  /// Lưu VirusTotal API Key.
+  static Future<void> saveVirusTotalApiKey(String apiKey) async {
+    _prefs ??= await SharedPreferences.getInstance();
+    await _prefs?.setString(_keyVirusTotalApiKey, apiKey.trim());
+  }
 }

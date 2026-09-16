@@ -22,17 +22,13 @@ import '../../widgets/common/custom_button.dart';
 /// Widget này emit payload QR về parent qua callback `onPayloadChanged`
 /// để parent update preview QR và quản lý nút "Tạo mã".
 class GenerateFormWidget extends StatefulWidget {
-  /// Loại QR đang tạo — quyết định form input nào được hiển thị.
   final QRType type;
-
-  /// GlobalKey cho RepaintBoundary — parent truyền vào để export PNG.
   final GlobalKey? repaintKey;
-
-  /// Callback mỗi khi nội dung form thay đổi — payload QR được gửi về parent.
   final ValueChanged<String> onPayloadChanged;
-
-  /// Callback khi người dùng muốn hủy tạo mã.
   final VoidCallback onCancel;
+
+  /// Callback khi user chọn logo — trả về file path.
+  final ValueChanged<String?>? onLogoChanged;
 
   const GenerateFormWidget({
     super.key,
@@ -40,6 +36,7 @@ class GenerateFormWidget extends StatefulWidget {
     this.repaintKey,
     required this.onPayloadChanged,
     required this.onCancel,
+    this.onLogoChanged,
   });
 
   @override
@@ -53,13 +50,9 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
   String? _cloudImageUrl;
   String? _uploadError;
 
-  /// Map lưu TextEditingController cho mỗi loại QR.
-  ///
-  /// Mỗi loại có số lượng field khác nhau:
-  /// - text/number/website/location: 1 controller
-  /// - wifi: 2 controllers (SSID + password)
-  /// - vcard: 5 controllers (name, phone, email, company, address)
-  /// - event: 4 controllers (title, location, dateTime, note)
+  // Logo state
+  String? _logoPath;
+
   late final Map<QRType, List<TextEditingController>> _controllers;
 
   @override
@@ -181,6 +174,19 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
     }
   }
 
+  Future<void> _pickLogo() async {
+    final file = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+    if (file != null && mounted) {
+      setState(() => _logoPath = file.path);
+      widget.onLogoChanged?.call(file.path);
+    }
+  }
+
+  void _removeLogo() {
+    setState(() => _logoPath = null);
+    widget.onLogoChanged?.call(null);
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -190,6 +196,77 @@ class _GenerateFormWidgetState extends State<GenerateFormWidget> {
         children: [
           // Form input thay đổi theo loại QR đang chọn
           _buildInput(),
+          const SizedBox(height: 16),
+
+          // Logo picker (cho QR có logo)
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.purple.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.purple.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.photo_library_outlined, size: 18, color: Colors.purple[400]),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Logo (tùy chọn)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.purple[700],
+                      ),
+                    ),
+                    const Spacer(),
+                    if (_logoPath != null)
+                      TextButton.icon(
+                        onPressed: _removeLogo,
+                        icon: const Icon(Icons.close, size: 16),
+                        label: const Text('Xóa'),
+                        style: TextButton.styleFrom(foregroundColor: Colors.red),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Thêm logo vào giữa mã QR (dùng API QR Gen)',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 12),
+                if (_logoPath != null) ...[
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(_logoPath!),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _pickLogo,
+                    icon: Icon(_logoPath == null ? Icons.add_photo_alternate_outlined : Icons.change_circle_outlined),
+                    label: Text(_logoPath == null ? 'Chọn logo từ thư viện' : 'Thay đổi logo'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.purple[600],
+                      side: BorderSide(color: Colors.purple.withValues(alpha: 0.3)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           const SizedBox(height: 24),
         ],
       ),

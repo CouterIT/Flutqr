@@ -1,9 +1,12 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_colors.dart';
 import '../../../models/qr_data_model.dart';
 import '../../../models/qr_type.dart';
 import '../../../services/qr_service.dart';
+import '../../../services/qr_gen_api_service.dart';
 import '../../../services/storage_service.dart';
 import '../../../core/utils/selection_controller.dart';
 import '../../widgets/common/custom_button.dart';
@@ -40,6 +43,7 @@ class GenerateScreenState extends State<GenerateScreen> {
   bool _isSaving = false;
   QRType? _selectedType;
   String _qrPayload = '';
+  String? _logoPath;
 
   /// Reset toàn bộ state của screen về vị trí ban đầu (danh sách mã đã tạo).
   void resetState() {
@@ -153,6 +157,7 @@ class GenerateScreenState extends State<GenerateScreen> {
       _isCreating = false;
       _selectedType = null;
       _qrPayload = '';
+      _logoPath = null;
     });
   }
 
@@ -163,12 +168,55 @@ class GenerateScreenState extends State<GenerateScreen> {
     setState(() => _isSaving = true);
 
     try {
+      // Nếu có logo → gọi QR Gen API để tạo QR có logo
+      Uint8List? qrImageBytes;
+      String? apiLogoPath;
+      if (_logoPath != null && _logoPath!.isNotEmpty) {
+        final logoFile = File(_logoPath!);
+        if (logoFile.existsSync()) {
+          final apiResponse = await QrGenApiService.generateWithLogo(
+            data: _qrPayload,
+            logoFile: logoFile,
+          );
+          if (apiResponse.success) {
+            qrImageBytes = apiResponse.imageBytes;
+            // Lưu QR có logo ra file để hiển thị sau này
+            final appDir = await Directory.systemTemp.createTemp('flutqr_');
+            apiLogoPath = '${appDir.path}/qr_logo_${DateTime.now().millisecondsSinceEpoch}.png';
+            await File(apiLogoPath).writeAsBytes(qrImageBytes!);
+          } else {
+            debugPrint('QR Gen API failed: ${apiResponse.errorMessage}, fallback về render local');
+          }
+        }
+      }
+
       final model = QRService.parseRawData(_qrPayload, isGenerated: true);
-      await StorageService.saveCreatedItem(model);
+
+      // Lưu logoPath vào metadata nếu có
+      QRDataModel finalModel = model;
+      if (_logoPath != null && _logoPath!.isNotEmpty) {
+        final metadata = {
+          ...?model.metadata,
+          'logoPath': _logoPath!,
+          'hasLogo': 'true',
+          if (apiLogoPath != null) 'apiLogoPath': apiLogoPath,
+        };
+        finalModel = QRDataModel(
+          id: model.id,
+          rawValue: model.rawValue,
+          type: model.type,
+          title: model.title,
+          timestamp: model.timestamp,
+          isGenerated: model.isGenerated,
+          metadata: metadata,
+        );
+      }
+
+      await StorageService.saveCreatedItem(finalModel);
       _cancelCreationFlow();
       _loadCreatedCodes();
       if (mounted) {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: model)));
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ScanResultScreen(qrData: finalModel)));
       }
     } catch (e) {
       debugPrint('Lỗi tạo mã QR: $e');
@@ -342,6 +390,7 @@ class GenerateScreenState extends State<GenerateScreen> {
             repaintKey: _previewQrKey,
             onPayloadChanged: (payload) => setState(() => _qrPayload = payload),
             onCancel: _cancelCreationFlow,
+            onLogoChanged: (path) => setState(() => _logoPath = path),
           ),
         ),
         Padding(

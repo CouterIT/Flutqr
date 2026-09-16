@@ -137,6 +137,23 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
     }
   }
 
+  Widget _buildQrWidget() {
+    final hasApiLogo = widget.qrData.metadata?['hasLogo'] == 'true' && widget.qrData.metadata?['apiLogoPath'] != null;
+    if (hasApiLogo) {
+      final file = File(widget.qrData.metadata!['apiLogoPath']!);
+      if (file.existsSync()) {
+        return Image.file(file, width: 210, height: 210, fit: BoxFit.contain);
+      }
+    }
+    return QrImageView(
+      data: widget.qrData.rawValue,
+      version: QrVersions.auto,
+      size: 210,
+      eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
+      dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
+    );
+  }
+
   /// Chia sẻ file PNG của mã QR qua native share sheet.
   Future<void> _shareQrImageFile() async {
     await QrExporter.shareQrImage(_qrBoundaryKey, text: 'Mã QR (${_type.displayName}): ${widget.qrData.title}');
@@ -215,13 +232,7 @@ class _ScanResultScreenState extends State<ScanResultScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFEEEEEE), width: 1.5)),
-                          child: QrImageView(
-                            data: widget.qrData.rawValue,
-                            version: QrVersions.auto,
-                            size: 210,
-                            eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
-                            dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: Colors.black),
-                          ),
+                          child: _buildQrWidget(),
                         ),
                       ),
                     ),
